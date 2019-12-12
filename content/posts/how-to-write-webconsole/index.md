@@ -1,6 +1,8 @@
 ---
 title: "如何设计与实现WebCosole"
 date: 2019-12-04T09:13:51+08:00
+tags: ["ssh"]
+categories: ["杂技浅尝"]
 draft: false
 ---
 
