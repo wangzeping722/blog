@@ -1,7 +1,7 @@
 baseURL = "https://wangzeping722.github.io/"
 languageCode = "zh"
 defaultContentLanguage = "zh"
-title = "Wrong"
+title = "小王的杂货铺"
 theme = "hermit"
 # enableGitInfo = true
 pygmentsCodefences  = true
@@ -14,7 +14,7 @@ enableEmoji = true  # Shorthand emojis in content files - https://gohugo.io/func
 # disqusShortname = "yourdiscussshortname"
 
 [author]
-  name = "Wrong"
+  name = "小王的杂货铺"
 
 [blackfriday]
   # hrefTargetBlank = true
@@ -62,11 +62,11 @@ enableEmoji = true  # Shorthand emojis in content files - https://gohugo.io/func
 [menu]
 
   [[menu.main]]
-    name = "Posts"
+    name = "文章"
     url = "posts/"
     weight = 10
 
   [[menu.main]]
-    name = "About"
+    name = "关于"
     url = "about/"
     weight = 20
