@@ -10,19 +10,26 @@ gRPC Resolver 是 gRPC 的核心功能之一，与 gRPC Balancer 一起负责 gR
 
 ## 2. Resolver
 
-下图是 gRPC 的架构图，其工作流程就是图中的数字标注的那样，[官方文档](https://github.com/grpc/grpc/blob/master/doc/load-balancing.md)中也给出了具体的说明：
+下图是 gRPC 客户端负载均衡的架构图：
 
-![](https://blog-wero.oss-cn-shanghai.aliyuncs.com/img/load-balancing.png)
+<img src="https://raw.githubusercontent.com/grpc/proposal/master/L9_graphics/bar_after.png" />
 
-可以看出，Resolver 位于图片的左上方，负责以下工作：
+从图中可以看出，Resolver 位于图片的左方，gRPC 负载与 Resolver 交互：
 
-- 通过服务名解析出服务提供方的 IP 地址
-- 把解析出来的服务信息同步给 Load Balancer
-
-
+1. 首先会 Build 一个 Resolver 实例，并且 watch 后端服务列表的变化
+2. 当服务列表发生变化后，Resolver 通过 gRPC 通知 Balancer
 
 
-## 3. 源码分析
+
+## 3. 基本概念
+
+`ClientConn` 对象是连接管理的入口，表示到服务端的一个逻辑的连接，会做名字解析、负载均衡、KeepAlive 等连接管理方面的操作，是个线程安全的对象。
+
+每个 `ClientConn` 对应有多个 `SubConn`，`ClientConn` 会基于服务发现（resolver）得到多个 SubConn，并在多个 `SubConn` 之间实现负载均衡（balancer）。
+
+
+
+## 4. 源码分析
 
 Resolver 的代码主要集中在 resolver 包中，里面主要包含了服务解析的接口定义，我们既可以自己通过实现 resolver 中的接口来自定义自己的 Resolver，也可以使用 gRPC 实现的 [DNSResolver](https://github.com/grpc/grpc-go/blob/master/internal/resolver/dns/dns_resolver.go)。
 
@@ -189,7 +196,7 @@ resolver 包的使用流程是，通过 Builder 接口来创建 Resolver，我�
 
 
 
-## 4. Resolver 应用
+## 5. Resolver 应用
 
 下面我们写一个完整的例子，用来分析 Resolver 的工作流程，我们程序的目的就是客户端通过 rpc 调用服务器的接口并打印出结果。为了减少篇幅，我就不贴出所有的代码，完整的代码可以在我的 [github](https://github.com/wangzeping722/gRPC-resolver-demo) 获取。
 
@@ -402,7 +409,7 @@ func newCCResolverWrapper(cc *ClientConn, rb resolver.Builder) (*ccResolverWrapp
 		done: grpcsync.NewEvent(),
 	}
 	...
-	rbo := resolver.BuildOptions{
+	rbo := resolve r.BuildOptions{
 		DisableServiceConfig: cc.dopts.disableServiceConfig,
 		DialCreds:            credsClone,
 		CredsBundle:          cc.dopts.copts.CredsBundle,
@@ -428,4 +435,5 @@ func newCCResolverWrapper(cc *ClientConn, rb resolver.Builder) (*ccResolverWrapp
 
 ### 总结
 
-到这里，对 Resolver 的分析基本完成，下一篇文章会分析 gRPC Balancer 哦。
+到这里，对 Resolver 的分析基本完成，下一篇文章会分析 gRPC Balancer。
+
