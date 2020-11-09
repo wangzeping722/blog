@@ -1,5 +1,5 @@
 ---
-title: "gRPC Resolver 原理"
+title: "gRPC Resolver 分析"
 date: 2020-10-29T09:56:05+08:00
 draft: false
 ---
