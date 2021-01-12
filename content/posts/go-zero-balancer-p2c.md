@@ -1,7 +1,7 @@
 ---
 title: "go-zero源码分析： P2C 负载均衡算法"
 date: 2020-01-02T16:30:18+08:00
-draft: true
+draft: false
 ---
 
 看完文章[基于gRPC的注册发现与负载均衡的原理和实战](https://mp.weixin.qq.com/s/olPGfrFczo22rhpPLBmpNw)后大呼过瘾，但是文章中对负载均衡算法—— p2c 算法的介绍不是很详细，于是乎就去学习了一下。
