@@ -72,7 +72,12 @@ enableEmoji = true  # Shorthand emojis in content files - https://gohugo.io/func
     weight = 2
 
   [[menu.main]]
+    name = "收集"
+    url = "collect/"
+    weight = 3
+
+  [[menu.main]]
     name = "关于"
     url = "about/"
-    weight = 3
+    weight = 4
 
