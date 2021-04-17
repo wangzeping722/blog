@@ -1,7 +1,7 @@
 ---
 title: "Term Color"
 date: 2021-04-17T12:01:11+08:00
-draft: true
+draft: false
 ---
 
 ANSI转义序列（ANSI escape sequences）是一种的标准，用于控制视频文本上的光标位置、颜色和其他选项。在文本中嵌入确定的字节序列，大部分以和"。通过键入这些特殊的字符串，我们可以实现终端的颜色输出。
