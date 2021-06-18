@@ -8,16 +8,19 @@
 	<meta name="theme-color" content="#494f5c">
 	<meta name="msapplication-TileColor" content="#494f5c">
 <meta itemprop="name" content="Rust学习——trait">
-<meta itemprop="description" content="trait 是 Rust 的灵魂。从语义上来说，trait 是在行为上对类型的约束，这种约束可以让 trait 有如下四种用法： 接口抽象：接口是对类型行为的统一约束； 泛型约束"><meta itemprop="datePublished" content="2021-04-10T17:30:17&#43;08:00" />
+<meta itemprop="description" content="trait 是 Rust 的灵魂。从语义上来说，trait 是在行为上对类型的约束，这种约束可以让 trait 有如下四种用法： 接口抽象：接口是对类型行为的统一约束； 泛型约束">
+<meta itemprop="datePublished" content="2021-04-10T17:30:17&#43;08:00" />
 <meta itemprop="dateModified" content="2021-04-10T17:30:17&#43;08:00" />
 <meta itemprop="wordCount" content="1164">
+
+
+
 <meta itemprop="keywords" content="" /><meta property="og:title" content="Rust学习——trait" />
 <meta property="og:description" content="trait 是 Rust 的灵魂。从语义上来说，trait 是在行为上对类型的约束，这种约束可以让 trait 有如下四种用法： 接口抽象：接口是对类型行为的统一约束； 泛型约束" />
 <meta property="og:type" content="article" />
-<meta property="og:url" content="https://wangzeping722.github.io/posts/rust-learn-trait/" /><meta property="article:section" content="posts" />
-<meta property="article:published_time" content="2021-04-10T17:30:17&#43;08:00" />
-<meta property="article:modified_time" content="2021-04-10T17:30:17&#43;08:00" />
-
+<meta property="og:url" content="https://wangzeping722.github.io/posts/rust-learn-trait/" />
+<meta property="article:published_time" content="2021-04-10T17:30:17+08:00" />
+<meta property="article:modified_time" content="2021-04-10T17:30:17+08:00" />
 <meta name="twitter:card" content="summary"/>
 <meta name="twitter:title" content="Rust学习——trait"/>
 <meta name="twitter:description" content="trait 是 Rust 的灵魂。从语义上来说，trait 是在行为上对类型的约束，这种约束可以让 trait 有如下四种用法： 接口抽象：接口是对类型行为的统一约束； 泛型约束"/>
@@ -30,7 +33,7 @@
 	<link rel="shortcut icon" href="/favicon.ico">
 
 	<title>Rust学习——trait</title>
-	<link rel="stylesheet" href="https://wangzeping722.github.io/css/style.min.037b6ee8f8c1baab6a3d0a9da11c3ff18a7552471f16c59fd98538d5ce99208b.css" integrity="sha256-A3tu6PjBuqtqPQqdoRw/8Yp1UkcfFsWf2YU41c6ZIIs=" crossorigin="anonymous">
+	<link rel="stylesheet" href="https://wangzeping722.github.io/css/style.min.eac77496566fd7d5768fd650ddb0b2b181ca6a2d7c5fdd6fe6b8ba4bf47e566f.css" integrity="sha256-6sd0llZv19V2j9ZQ3bCysYHKai18X91v5ri6S/R+Vm8=" crossorigin="anonymous">
 	
 </head>
 
@@ -83,13 +86,13 @@
 <h2 id="接口抽象">接口抽象<a href="#接口抽象" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
 <p>trait 最基础的用法就是进行接口抽象，可以看做是其他语言中的 interface，例如 golang 中的 interface 定义了一些行为：</p>
 <div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">Cat</span> <span class="kd">interface</span> <span class="p">{</span>
-    <span class="nf">Miao</span><span class="p">()</span> <span class="kt">string</span>
-    <span class="nf">Parkour</span><span class="p">()</span> <span class="kt">string</span>
+    <span class="nf">Miao</span><span class="p">(</span><span class="p">)</span> <span class="kt">string</span>
+    <span class="nf">Parkour</span><span class="p">(</span><span class="p">)</span> <span class="kt">string</span>
 <span class="p">}</span>
 </code></pre></div><div class="highlight"><pre class="chroma"><code class="language-rust" data-lang="rust"><span class="c1">// rust 中的 trait
 </span><span class="c1"></span><span class="k">pub</span><span class="w"> </span><span class="k">trait</span><span class="w"> </span><span class="n">Cat</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="k">fn</span> <span class="nf">miao</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span>-&gt; <span class="nb">String</span><span class="p">;</span><span class="w">
-</span><span class="w">    </span><span class="k">fn</span> <span class="nf">parkour</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span>-&gt; <span class="nb">String</span><span class="p">;</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="k">fn</span> <span class="nf">miao</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span>-&gt; <span class="nb">String</span><span class="p">;</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="k">fn</span> <span class="nf">parkour</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span>-&gt; <span class="nb">String</span><span class="p">;</span><span class="w">
 </span><span class="w"></span><span class="p">}</span><span class="w">
 </span></code></pre></div><p>看起来是不是如出一辙，trait 告诉 Rust 编译器某个特定类型拥有可能与其他类型共享的功能。可以通过 trait 以一种抽象的方式定义共享的行为。其特点如下：</p>
 <ul>
@@ -100,54 +103,54 @@
 <h3 id="trait-继承">trait 继承<a href="#trait-继承" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
 <p>Rust 不支持传统面向对象的继承，但是支持 trait 继承。子 trait 可以继承父 trait 中定义或实现的方法。例如：</p>
 <div class="highlight"><pre class="chroma"><code class="language-rust" data-lang="rust"><span class="k">trait</span><span class="w"> </span><span class="n">People</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="k">fn</span> <span class="nf">speak</span><span class="p">();</span><span class="w">
-</span><span class="w">    </span><span class="k">fn</span> <span class="nf">walk</span><span class="p">();</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="k">fn</span> <span class="nf">speak</span><span class="p">(</span><span class="p">)</span><span class="p">;</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="k">fn</span> <span class="nf">walk</span><span class="p">(</span><span class="p">)</span><span class="p">;</span><span class="w">
 </span><span class="w"></span><span class="p">}</span><span class="w">
 </span><span class="w"></span><span class="k">trait</span><span class="w"> </span><span class="n">Teacher</span>: <span class="nc">People</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="k">fn</span> <span class="nf">teach_student</span><span class="p">();</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="k">fn</span> <span class="nf">teach_student</span><span class="p">(</span><span class="p">)</span><span class="p">;</span><span class="w">
 </span><span class="w"></span><span class="p">}</span><span class="w">
 </span></code></pre></div><p>需要注意的是包含 trait 限定的泛型属于静态分发，所以调用 trait 限定中的方法也都是零成本。</p>
 <h2 id="泛型约束">泛型约束<a href="#泛型约束" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
 <p>在使用泛型时，如果想限定能够使用该泛型行为的对象时，就可以给改泛型加上 trait 约束。</p>
 <div class="highlight"><pre class="chroma"><code class="language-rust" data-lang="rust"><span class="k">use</span><span class="w"> </span><span class="n">std</span>::<span class="n">ops</span>::<span class="n">Add</span><span class="p">;</span><span class="w">
-</span><span class="w"></span><span class="k">fn</span> <span class="nf">sum</span><span class="o">&lt;</span><span class="n">T</span>: <span class="nc">Add</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="n">Output</span><span class="o">=</span><span class="n">T</span><span class="o">&gt;&gt;</span><span class="p">(</span><span class="n">a</span>: <span class="nc">T</span><span class="p">,</span><span class="w"> </span><span class="n">b</span>: <span class="nc">T</span><span class="p">)</span><span class="w"> </span>-&gt; <span class="nc">T</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="w">
+</span><span class="w"></span><span class="k">fn</span> <span class="nf">sum</span><span class="o">&lt;</span><span class="n">T</span>: <span class="nc">Add</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="n">Output</span><span class="o">=</span><span class="n">T</span><span class="o">&gt;</span><span class="o">&gt;</span><span class="p">(</span><span class="n">a</span>: <span class="nc">T</span><span class="p">,</span><span class="w"> </span><span class="n">b</span>: <span class="nc">T</span><span class="p">)</span><span class="w"> </span>-&gt; <span class="nc">T</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="w">
 </span><span class="w"></span><span class="p">}</span><span class="w">
-</span><span class="w">
-</span><span class="w"></span><span class="k">fn</span> <span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="n">assert_eq</span><span class="o">!</span><span class="p">(</span><span class="n">sum</span><span class="p">(</span><span class="mi">1</span><span class="k">u32</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="k">u32</span><span class="p">),</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span><span class="w">
+</span><span class="w"></span><span class="w">
+</span><span class="w"></span><span class="k">fn</span> <span class="nf">main</span><span class="p">(</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="n">assert_eq</span><span class="o">!</span><span class="p">(</span><span class="n">sum</span><span class="p">(</span><span class="mi">1</span><span class="k">u32</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="k">u32</span><span class="p">)</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">)</span><span class="p">;</span><span class="w">
 </span><span class="w"></span><span class="p">}</span><span class="w">
 </span></code></pre></div><h2 id="抽象类型">抽象类型<a href="#抽象类型" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
 <p>trait 还可以用来当作抽象类型，抽象类型是类型系统的一种，也叫做存在类型。相对于具体类型而言，抽象类型无法直接实例化，他的每个实例都是具体类型的实例。</p>
 <p>编译器可能无法确定抽象类型的确切功能和所占空间大小，所以 Rust 目前有两种方法来处理抽象类型：▪<code>trait对象</code>▪ 和 ▪<code>impl Trait</code>▪。</p>
 <h3 id="trait-对象">trait 对象<a href="#trait-对象" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
 <p>trait 对象就是拥有相同行为的类型的抽象对象，也称为 <code>Trait Object</code>。需要记住的是，用 trait 限定的泛型参数是属于静态分发，而使用 trait object 属于动态分发，两者在性能上是有差别的。</p>
-<div class="highlight"><pre class="chroma"><code class="language-rust" data-lang="rust"><span class="cp">#[derive(Debug)]</span><span class="w">
+<div class="highlight"><pre class="chroma"><code class="language-rust" data-lang="rust"><span class="cp">#[</span><span class="cp">derive(Debug)</span><span class="cp">]</span><span class="w">
 </span><span class="w"></span><span class="k">struct</span> <span class="nc">Foo</span><span class="p">;</span><span class="w">
-</span><span class="w">
+</span><span class="w"></span><span class="w">
 </span><span class="w"></span><span class="k">trait</span><span class="w"> </span><span class="n">Bar</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="k">fn</span> <span class="nf">baz</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">);</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="k">fn</span> <span class="nf">baz</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="p">;</span><span class="w">
 </span><span class="w"></span><span class="p">}</span><span class="w">
-</span><span class="w">
+</span><span class="w"></span><span class="w">
 </span><span class="w"></span><span class="k">impl</span><span class="w"> </span><span class="n">Bar</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">Foo</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="k">fn</span> <span class="nf">baz</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">        </span><span class="n">println</span><span class="o">!</span><span class="p">(</span><span class="s">&#34;{:?}&#34;</span><span class="p">,</span><span class="w"> </span><span class="bp">self</span><span class="p">)</span><span class="w">
-</span><span class="w">    </span><span class="p">}</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="k">fn</span> <span class="nf">baz</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span><span class="w"></span><span class="w">        </span><span class="n">println</span><span class="o">!</span><span class="p">(</span><span class="s">&#34;{:?}&#34;</span><span class="p">,</span><span class="w"> </span><span class="bp">self</span><span class="p">)</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="p">}</span><span class="w">
 </span><span class="w"></span><span class="p">}</span><span class="w">
-</span><span class="w">
+</span><span class="w"></span><span class="w">
 </span><span class="w"></span><span class="k">fn</span> <span class="nf">static_dispatch</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span><span class="p">(</span><span class="n">t</span>: <span class="kp">&amp;</span><span class="nc">T</span><span class="p">)</span><span class="w"> </span><span class="k">where</span><span class="w"> </span><span class="n">T</span>: <span class="nc">Bar</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="n">t</span><span class="p">.</span><span class="n">baz</span><span class="p">();</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="n">t</span><span class="p">.</span><span class="n">baz</span><span class="p">(</span><span class="p">)</span><span class="p">;</span><span class="w">
 </span><span class="w"></span><span class="p">}</span><span class="w">
-</span><span class="w">
+</span><span class="w"></span><span class="w">
 </span><span class="w"></span><span class="k">fn</span> <span class="nf">dynamic_dispatch</span><span class="p">(</span><span class="n">t</span>: <span class="kp">&amp;</span><span class="nc">dyn</span><span class="w"> </span><span class="n">Bar</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="n">t</span><span class="p">.</span><span class="n">baz</span><span class="p">();</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="n">t</span><span class="p">.</span><span class="n">baz</span><span class="p">(</span><span class="p">)</span><span class="p">;</span><span class="w">
 </span><span class="w"></span><span class="p">}</span><span class="w">
-</span><span class="w">
-</span><span class="w">
-</span><span class="w"></span><span class="k">fn</span> <span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
-</span><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">foo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Foo</span><span class="p">;</span><span class="w">
-</span><span class="w">    </span><span class="n">static_dispatch</span><span class="p">(</span><span class="o">&amp;</span><span class="n">foo</span><span class="p">);</span><span class="w">
-</span><span class="w">    </span><span class="n">dynamic_dispatch</span><span class="p">(</span><span class="o">&amp;</span><span class="n">foo</span><span class="p">);</span><span class="w">
+</span><span class="w"></span><span class="w">
+</span><span class="w"></span><span class="w">
+</span><span class="w"></span><span class="k">fn</span> <span class="nf">main</span><span class="p">(</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">foo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Foo</span><span class="p">;</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="n">static_dispatch</span><span class="p">(</span><span class="o">&amp;</span><span class="n">foo</span><span class="p">)</span><span class="p">;</span><span class="w">
+</span><span class="w"></span><span class="w">    </span><span class="n">dynamic_dispatch</span><span class="p">(</span><span class="o">&amp;</span><span class="n">foo</span><span class="p">)</span><span class="p">;</span><span class="w">
 </span><span class="w"></span><span class="p">}</span><span class="w">
 </span></code></pre></div><p>trait 本身就是一种抽象而非具体类型，所有他的类型在编译期是不确定的，所以 trait 对象需要使用胖指针，可以利用&amp;或者 Box 来指针一个 trait 对象。Trait Object 包括两个指针：data 指针和 vtable 指针。vtable包含了 Trait Object 的方法、析构函数、大小和对齐等信息。</p>
 <p><img src="https://blog-wero.oss-cn-shanghai.aliyuncs.com/img/traitobject.png" alt="img"></p>
@@ -194,7 +197,7 @@
 
 
 
-	<script src="https://wangzeping722.github.io/js/bundle.min.7d8545daa55d62427355498dd8da13f98ff79a7938ce7d2a5e2ae1ec0de3beb8.js" integrity="sha256-fYVF2qVdYkJzVUmN2NoT+Y/3mnk4zn0qXirh7A3jvrg=" crossorigin="anonymous"></script>
+	<script src="https://wangzeping722.github.io/js/bundle.min.4a9a0ac3d2217822c7865b4161e6c2a71de1d70492264337755427898dd718f6.js" integrity="sha256-SpoKw9IheCLHhltBYebCpx3h1wSSJkM3dVQniY3XGPY=" crossorigin="anonymous"></script>
 	
 
 </body>

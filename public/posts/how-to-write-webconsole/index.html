@@ -8,16 +8,19 @@
 	<meta name="theme-color" content="#494f5c">
 	<meta name="msapplication-TileColor" content="#494f5c">
 <meta itemprop="name" content="如何设计与实现 WebConsole">
-<meta itemprop="description" content="1. 调研 前端：了解到有一个非常优秀的开源web终端库： xterm.js , 使用起来也比较简单。 后端：使用 go 语言实现，因为 go 语言拥有许多优秀的开源ssh库，能够"><meta itemprop="datePublished" content="2019-12-04T09:13:51&#43;08:00" />
+<meta itemprop="description" content="1. 调研 前端：了解到有一个非常优秀的开源web终端库： xterm.js , 使用起来也比较简单。 后端：使用 go 语言实现，因为 go 语言拥有许多优秀的开源ssh库，能够">
+<meta itemprop="datePublished" content="2019-12-04T09:13:51&#43;08:00" />
 <meta itemprop="dateModified" content="2019-12-04T09:13:51&#43;08:00" />
 <meta itemprop="wordCount" content="827">
+
+
+
 <meta itemprop="keywords" content="ssh," /><meta property="og:title" content="如何设计与实现 WebConsole" />
 <meta property="og:description" content="1. 调研 前端：了解到有一个非常优秀的开源web终端库： xterm.js , 使用起来也比较简单。 后端：使用 go 语言实现，因为 go 语言拥有许多优秀的开源ssh库，能够" />
 <meta property="og:type" content="article" />
-<meta property="og:url" content="https://wangzeping722.github.io/posts/how-to-write-webconsole/" /><meta property="article:section" content="posts" />
-<meta property="article:published_time" content="2019-12-04T09:13:51&#43;08:00" />
-<meta property="article:modified_time" content="2019-12-04T09:13:51&#43;08:00" />
-
+<meta property="og:url" content="https://wangzeping722.github.io/posts/how-to-write-webconsole/" />
+<meta property="article:published_time" content="2019-12-04T09:13:51+08:00" />
+<meta property="article:modified_time" content="2019-12-04T09:13:51+08:00" />
 <meta name="twitter:card" content="summary"/>
 <meta name="twitter:title" content="如何设计与实现 WebConsole"/>
 <meta name="twitter:description" content="1. 调研 前端：了解到有一个非常优秀的开源web终端库： xterm.js , 使用起来也比较简单。 后端：使用 go 语言实现，因为 go 语言拥有许多优秀的开源ssh库，能够"/>
@@ -30,7 +33,7 @@
 	<link rel="shortcut icon" href="/favicon.ico">
 
 	<title>如何设计与实现 WebConsole</title>
-	<link rel="stylesheet" href="https://wangzeping722.github.io/css/style.min.037b6ee8f8c1baab6a3d0a9da11c3ff18a7552471f16c59fd98538d5ce99208b.css" integrity="sha256-A3tu6PjBuqtqPQqdoRw/8Yp1UkcfFsWf2YU41c6ZIIs=" crossorigin="anonymous">
+	<link rel="stylesheet" href="https://wangzeping722.github.io/css/style.min.eac77496566fd7d5768fd650ddb0b2b181ca6a2d7c5fdd6fe6b8ba4bf47e566f.css" integrity="sha256-6sd0llZv19V2j9ZQ3bCysYHKai18X91v5ri6S/R+Vm8=" crossorigin="anonymous">
 	
 </head>
 
@@ -101,44 +104,44 @@
 		<span class="nx">WriteBufferSize</span><span class="p">:</span> <span class="mi">1024</span><span class="p">,</span>
 	<span class="p">}</span>
 	<span class="nx">ws</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">upgrader</span><span class="p">.</span><span class="nf">Upgrade</span><span class="p">(</span><span class="nx">c</span><span class="p">.</span><span class="nx">Writer</span><span class="p">,</span> <span class="nx">c</span><span class="p">.</span><span class="nx">Request</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
-	<span class="k">defer</span> <span class="nx">ws</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+	<span class="k">defer</span> <span class="nx">ws</span><span class="p">.</span><span class="nf">Close</span><span class="p">(</span><span class="p">)</span>
   
 	<span class="c1">// 初始化ssh连接
 </span><span class="c1"></span>	<span class="nx">cl</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">c</span><span class="p">.</span><span class="nf">Get</span><span class="p">(</span><span class="s">&#34;claims&#34;</span><span class="p">)</span>
 	<span class="nx">s</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">c</span><span class="p">.</span><span class="nf">Get</span><span class="p">(</span><span class="s">&#34;session&#34;</span><span class="p">)</span>
-	<span class="nx">claims</span> <span class="o">:=</span> <span class="nx">cl</span><span class="p">.(</span><span class="o">*</span><span class="nx">utils</span><span class="p">.</span><span class="nx">Claims</span><span class="p">)</span>
-	<span class="nx">session</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.(</span><span class="o">*</span><span class="nx">utils</span><span class="p">.</span><span class="nx">Session</span><span class="p">)</span>
+	<span class="nx">claims</span> <span class="o">:=</span> <span class="nx">cl</span><span class="p">.</span><span class="p">(</span><span class="o">*</span><span class="nx">utils</span><span class="p">.</span><span class="nx">Claims</span><span class="p">)</span>
+	<span class="nx">session</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="p">(</span><span class="o">*</span><span class="nx">utils</span><span class="p">.</span><span class="nx">Session</span><span class="p">)</span>
 
 	<span class="nx">sshShell</span> <span class="o">:=</span> <span class="nx">utils</span><span class="p">.</span><span class="nx">SSHShellSession</span><span class="p">{</span>
 		<span class="nx">Node</span><span class="p">:</span> <span class="nx">utils</span><span class="p">.</span><span class="nx">Node</span><span class="p">{</span>
 			<span class="nx">Host</span><span class="p">:</span> <span class="nx">claims</span><span class="p">.</span><span class="nx">Host</span><span class="p">,</span>
 			<span class="nx">Port</span><span class="p">:</span> <span class="nx">claims</span><span class="p">.</span><span class="nx">Port</span><span class="p">,</span>
-		<span class="p">},</span>
+		<span class="p">}</span><span class="p">,</span>
 	<span class="p">}</span>
 
 	<span class="kd">var</span> <span class="nx">wsBuff</span> <span class="nx">WebSocketBufferWriter</span>
 	<span class="nx">sshShell</span><span class="p">.</span><span class="nx">StdoutPipe</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">wsBuff</span>
 	<span class="nx">err</span> <span class="p">=</span> <span class="nx">sshConn</span><span class="p">.</span><span class="nf">Connect</span><span class="p">(</span><span class="nx">username</span><span class="p">,</span> <span class="nx">password</span><span class="p">)</span>
-	<span class="k">defer</span> <span class="nx">sshConn</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+	<span class="k">defer</span> <span class="nx">sshConn</span><span class="p">.</span><span class="nf">Close</span><span class="p">(</span><span class="p">)</span>
 	<span class="k">defer</span> <span class="nx">wsBuff</span><span class="p">.</span><span class="nf">Flush</span><span class="p">(</span><span class="nx">websocket</span><span class="p">.</span><span class="nx">TextMessage</span><span class="p">,</span> <span class="nx">ws</span><span class="p">)</span>
-	<span class="o">......</span>
-  <span class="o">......</span>
+	<span class="o">...</span><span class="o">...</span>
+  <span class="o">...</span><span class="o">...</span>
 <span class="p">}</span>
 </code></pre></div><p><strong>连接保持：</strong></p>
 <div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">WS</span><span class="p">(</span><span class="nx">c</span> <span class="o">*</span><span class="nx">gin</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="p">{</span>
-  <span class="o">......</span>
-  <span class="o">......</span>
+  <span class="o">...</span><span class="o">...</span>
+  <span class="o">...</span><span class="o">...</span>
 	<span class="nx">done</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">bool</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
-	<span class="nx">setDone</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span> <span class="nx">done</span> <span class="o">&lt;-</span> <span class="kc">true</span> <span class="p">}</span>
+	<span class="nx">setDone</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">(</span><span class="p">)</span> <span class="p">{</span> <span class="nx">done</span> <span class="o">&lt;-</span> <span class="kc">true</span> <span class="p">}</span>
 
 	<span class="c1">// 数据转换：websocket ----&gt; SSH
 </span><span class="c1"></span>	<span class="nx">writeMessageToSSHServer</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">(</span><span class="nx">wc</span> <span class="nx">io</span><span class="p">.</span><span class="nx">WriteCloser</span><span class="p">)</span> <span class="p">{</span>
-		<span class="k">defer</span> <span class="nf">setDone</span><span class="p">()</span>
+		<span class="k">defer</span> <span class="nf">setDone</span><span class="p">(</span><span class="p">)</span>
 		<span class="k">for</span> <span class="p">{</span>
 			<span class="c1">// 从websocket读取数据
-</span><span class="c1"></span>			<span class="nx">msgType</span><span class="p">,</span> <span class="nx">p</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">ws</span><span class="p">.</span><span class="nf">ReadMessage</span><span class="p">()</span>
+</span><span class="c1"></span>			<span class="nx">msgType</span><span class="p">,</span> <span class="nx">p</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">ws</span><span class="p">.</span><span class="nf">ReadMessage</span><span class="p">(</span><span class="p">)</span>
 
-			<span class="k">if</span> <span class="nx">err</span> <span class="p">=</span> <span class="nf">DispatchMessage</span><span class="p">(</span><span class="nx">sshShell</span><span class="p">.</span><span class="nx">Session</span><span class="p">,</span> <span class="nx">msgType</span><span class="p">,</span> <span class="nx">p</span><span class="p">,</span> <span class="nx">wc</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+			<span class="k">if</span> <span class="nx">err</span> <span class="p">=</span> <span class="nf">DispatchMessage</span><span class="p">(</span><span class="nx">sshShell</span><span class="p">.</span><span class="nx">Session</span><span class="p">,</span> <span class="nx">msgType</span><span class="p">,</span> <span class="nx">p</span><span class="p">,</span> <span class="nx">wc</span><span class="p">)</span><span class="p">;</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
 				<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;Error: error write data to ssh server:&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
 				<span class="k">return</span>
 			<span class="p">}</span>
@@ -147,14 +150,14 @@
 
 	<span class="nx">stopper</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">bool</span><span class="p">)</span>
 	<span class="c1">// 数据转换：SSH ----&gt; websocket
-</span><span class="c1"></span>	<span class="nx">writeBufferToWebSocket</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
-		<span class="k">defer</span> <span class="nf">setDone</span><span class="p">()</span>
-		<span class="nx">tick</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">NewTicker</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nx">Millisecond</span> <span class="o">*</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Duration</span><span class="p">(</span><span class="nx">utils</span><span class="p">.</span><span class="nx">Config</span><span class="p">.</span><span class="nx">SSH</span><span class="p">.</span><span class="nx">BufferCheckerCycleTime</span><span class="p">))</span>
-		<span class="k">defer</span> <span class="nx">tick</span><span class="p">.</span><span class="nf">Stop</span><span class="p">()</span>
+</span><span class="c1"></span>	<span class="nx">writeBufferToWebSocket</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">(</span><span class="p">)</span> <span class="p">{</span>
+		<span class="k">defer</span> <span class="nf">setDone</span><span class="p">(</span><span class="p">)</span>
+		<span class="nx">tick</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">NewTicker</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nx">Millisecond</span> <span class="o">*</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Duration</span><span class="p">(</span><span class="nx">utils</span><span class="p">.</span><span class="nx">Config</span><span class="p">.</span><span class="nx">SSH</span><span class="p">.</span><span class="nx">BufferCheckerCycleTime</span><span class="p">)</span><span class="p">)</span>
+		<span class="k">defer</span> <span class="nx">tick</span><span class="p">.</span><span class="nf">Stop</span><span class="p">(</span><span class="p">)</span>
 		<span class="k">for</span> <span class="p">{</span>
 			<span class="k">select</span> <span class="p">{</span>
 			<span class="k">case</span> <span class="o">&lt;-</span><span class="nx">tick</span><span class="p">.</span><span class="nx">C</span><span class="p">:</span>
-				<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">wsBuff</span><span class="p">.</span><span class="nf">Flush</span><span class="p">(</span><span class="nx">websocket</span><span class="p">.</span><span class="nx">TextMessage</span><span class="p">,</span> <span class="nx">ws</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+				<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">wsBuff</span><span class="p">.</span><span class="nf">Flush</span><span class="p">(</span><span class="nx">websocket</span><span class="p">.</span><span class="nx">TextMessage</span><span class="p">,</span> <span class="nx">ws</span><span class="p">)</span><span class="p">;</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
 					<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;Error: error sending data via webSocket:&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
 					<span class="k">return</span>
 				<span class="p">}</span>
@@ -165,13 +168,13 @@
 	<span class="p">}</span>
 
 	<span class="k">go</span> <span class="nf">writeMessageToSSHServer</span><span class="p">(</span><span class="nx">sshShell</span><span class="p">.</span><span class="nx">StdinPipe</span><span class="p">)</span>
-	<span class="k">go</span> <span class="nf">writeBufferToWebSocket</span><span class="p">()</span>
-	<span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
-		<span class="k">defer</span> <span class="nf">setDone</span><span class="p">()</span>
-		<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">sshShell</span><span class="p">.</span><span class="nx">Session</span><span class="p">.</span><span class="nf">Wait</span><span class="p">();</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span><span class="p">{</span>
+	<span class="k">go</span> <span class="nf">writeBufferToWebSocket</span><span class="p">(</span><span class="p">)</span>
+	<span class="k">go</span> <span class="kd">func</span><span class="p">(</span><span class="p">)</span> <span class="p">{</span>
+		<span class="k">defer</span> <span class="nf">setDone</span><span class="p">(</span><span class="p">)</span>
+		<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">sshShell</span><span class="p">.</span><span class="nx">Session</span><span class="p">.</span><span class="nf">Wait</span><span class="p">(</span><span class="p">)</span><span class="p">;</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span><span class="p">{</span>
 			<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;ssh exist from server&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
 		<span class="p">}</span>
-	<span class="p">}()</span>
+	<span class="p">}</span><span class="p">(</span><span class="p">)</span>
 
 	<span class="o">&lt;-</span><span class="nx">done</span>
 	<span class="nx">stopper</span> <span class="o">&lt;-</span> <span class="kc">true</span> 
@@ -211,7 +214,7 @@
 
 
 
-	<script src="https://wangzeping722.github.io/js/bundle.min.7d8545daa55d62427355498dd8da13f98ff79a7938ce7d2a5e2ae1ec0de3beb8.js" integrity="sha256-fYVF2qVdYkJzVUmN2NoT+Y/3mnk4zn0qXirh7A3jvrg=" crossorigin="anonymous"></script>
+	<script src="https://wangzeping722.github.io/js/bundle.min.4a9a0ac3d2217822c7865b4161e6c2a71de1d70492264337755427898dd718f6.js" integrity="sha256-SpoKw9IheCLHhltBYebCpx3h1wSSJkM3dVQniY3XGPY=" crossorigin="anonymous"></script>
 	
 
 </body>
