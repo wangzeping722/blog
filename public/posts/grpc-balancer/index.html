@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<meta name="theme-color" content="#494f5c">
+	<meta name="msapplication-TileColor" content="#494f5c">
+<meta itemprop="name" content="gRPC Balancer 分析">
+<meta itemprop="description" content="1. 负载均衡 gRPC 实现负载均衡的方法主要有三种，分别是 集中式 LB（Proxy Model） 进程内 LB（Balancing-aware Client） 独"><meta itemprop="datePublished" content="2020-11-06T18:07:55&#43;08:00" />
+<meta itemprop="dateModified" content="2020-11-06T18:07:55&#43;08:00" />
+<meta itemprop="wordCount" content="5458">
+<meta itemprop="keywords" content="" /><meta property="og:title" content="gRPC Balancer 分析" />
+<meta property="og:description" content="1. 负载均衡 gRPC 实现负载均衡的方法主要有三种，分别是 集中式 LB（Proxy Model） 进程内 LB（Balancing-aware Client） 独" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://wangzeping722.github.io/posts/grpc-balancer/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2020-11-06T18:07:55&#43;08:00" />
+<meta property="article:modified_time" content="2020-11-06T18:07:55&#43;08:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="gRPC Balancer 分析"/>
+<meta name="twitter:description" content="1. 负载均衡 gRPC 实现负载均衡的方法主要有三种，分别是 集中式 LB（Proxy Model） 进程内 LB（Balancing-aware Client） 独"/>
+
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<link rel="mask-icon" href="/safari-pinned-tab.svg" color="">
+	<link rel="shortcut icon" href="/favicon.ico">
+
+	<title>gRPC Balancer 分析</title>
+	<link rel="stylesheet" href="https://wangzeping722.github.io/css/style.min.037b6ee8f8c1baab6a3d0a9da11c3ff18a7552471f16c59fd98538d5ce99208b.css" integrity="sha256-A3tu6PjBuqtqPQqdoRw/8Yp1UkcfFsWf2YU41c6ZIIs=" crossorigin="anonymous">
+	
+</head>
+
+<body id="page">
+	
+	<header id="site-header" class="animated slideInUp">
+		<div class="hdr-wrapper section-inner">
+			<div class="hdr-left">
+				<div class="site-branding">
+					<a href="https://wangzeping722.github.io/">给我一条鱼🐟</a>
+				</div>
+				<nav class="site-nav hide-in-mobile">
+					
+				<a href="https://wangzeping722.github.io/posts/">文章</a>
+				<a href="https://wangzeping722.github.io/reading/">阅读</a>
+				<a href="https://wangzeping722.github.io/collect/">收集</a>
+				<a href="https://wangzeping722.github.io/about/">关于</a>
+
+				</nav>
+			</div>
+			<div class="hdr-right hdr-icons">
+				<span class="hdr-social hide-in-mobile"><a href="https://github.com/wangzeping722" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg></a></span><button id="menu-btn" class="hdr-btn" title=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+			</div>
+		</div>
+	</header>
+	<div id="mobile-menu" class="animated fast">
+		<ul>
+			<li><a href="https://wangzeping722.github.io/posts/">文章</a></li>
+			<li><a href="https://wangzeping722.github.io/reading/">阅读</a></li>
+			<li><a href="https://wangzeping722.github.io/collect/">收集</a></li>
+			<li><a href="https://wangzeping722.github.io/about/">关于</a></li>
+		</ul>
+	</div>
+
+
+	<main class="site-main section-inner animated fadeIn faster">
+		<article class="thin">
+			<header class="post-header">
+				<div class="post-meta"><span>Nov 6, 2020</span></div>
+				<h1>gRPC Balancer 分析</h1>
+			</header>
+			<div class="content">
+				<h2 id="1-负载均衡">1. 负载均衡<a href="#1-负载均衡" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>gRPC 实现负载均衡的方法主要有三种，分别是</p>
+<ul>
+<li>集中式 LB（Proxy Model）</li>
+<li>进程内 LB（Balancing-aware Client）</li>
+<li>独立 LB 进程（External Load Balancing Service）</li>
+</ul>
+<p>具体的实现方式请参考这篇文章<a href="https://segmentfault.com/a/1190000008672912">gRPC 服务发现&amp;负载均衡</a>。</p>
+<p>需要注意的是，gRPC 使用 <strong>进程内 LB</strong> 的方案，并且是基于每次调用 RPC 接口实现的负载均衡， 如下图：</p>
+<p><!-- raw HTML omitted --></p>
+<ol>
+<li>服务启动后 gRPC 客户端向注册中心获取后端服务列表</li>
+<li>客户端实例化负载均衡策略</li>
+<li>负载均衡器（Balancer）为每一个后端地址创建一个子连接（SubConn）</li>
+<li>当要发起 RPC 请求的时候，负载均衡器就会选择当前最匹配的子连接来进行 RCP 调用</li>
+</ol>
+<h2 id="2-问题">2. 问题<a href="#2-问题" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>带着问题来看源码，收获会更多：</p>
+<ul>
+<li>Balancer 如何接收来自 Resolver 解析出来的地址？</li>
+<li>与这些地址的连接是在哪建立的？</li>
+<li>如何选择每次调用适合的连接？</li>
+</ul>
+<p><a href="https://github.com/grpc/proposal/blob/master/L9-go-resolver-balancer-API.md">L9-go-resolver-balancer-API</a>这篇文章中给出了 resolver-balancer 的设计理念，并且给出了官方架构图：</p>
+<p><img src="https://blog-wero.oss-cn-shanghai.aliyuncs.com/img/resolver-balancer-arch.png" alt="resolver-balancer"></p>
+<p>图中，我们可以看见 Balancer 位于 gRPC 的右方，并且 Resolver 与 Balancer 没有耦合在一起，而是采用接口隔离加 Builder 和Wrapper 设计模式。其中，Balancer 负责与后端服务器建立连接，并且创建 Picker 来执行负载均衡的逻辑。</p>
+<h2 id="3-一切都要从-resolver-说起">3. 一切都要从 Resolver 说起<a href="#3-一切都要从-resolver-说起" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>上文，我们提到 Resolver 在解析到后端服务器列表之后会通过 <code>resolver.ClientConn.UpdateState(state)</code>来通知 gRPC 后端地址有更新，对应上图的左边 <code>Addr Updates</code>。代码如下：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// ccResolverWrapper 可以看做是 Resolver 的代理，并且实现了resolver.ClientConn接口
+</span><span class="c1"></span><span class="kd">type</span> <span class="nx">ccResolverWrapper</span> <span class="kd">struct</span> <span class="p">{</span>
+	<span class="nx">cc</span>         <span class="o">*</span><span class="nx">ClientConn</span>
+	<span class="nx">resolverMu</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Mutex</span>
+	<span class="nx">resolver</span>   <span class="nx">resolver</span><span class="p">.</span><span class="nx">Resolver</span>
+	<span class="nx">done</span>       <span class="o">*</span><span class="nx">grpcsync</span><span class="p">.</span><span class="nx">Event</span>
+	<span class="nx">curState</span>   <span class="nx">resolver</span><span class="p">.</span><span class="nx">State</span>
+
+	<span class="nx">pollingMu</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Mutex</span>
+	<span class="nx">polling</span>   <span class="kd">chan</span> <span class="kd">struct</span><span class="p">{}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">ccr</span> <span class="o">*</span><span class="nx">ccResolverWrapper</span><span class="p">)</span> <span class="nf">UpdateState</span><span class="p">(</span><span class="nx">s</span> <span class="nx">resolver</span><span class="p">.</span><span class="nx">State</span><span class="p">)</span> <span class="p">{</span>
+	<span class="k">if</span> <span class="nx">ccr</span><span class="p">.</span><span class="nx">done</span><span class="p">.</span><span class="nf">HasFired</span><span class="p">()</span> <span class="p">{</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+	<span class="o">...</span>
+	<span class="c1">// 更新地址池
+</span><span class="c1"></span>	<span class="nx">ccr</span><span class="p">.</span><span class="nx">curState</span> <span class="p">=</span> <span class="nx">s</span>
+	<span class="nx">ccr</span><span class="p">.</span><span class="nf">poll</span><span class="p">(</span><span class="nx">ccr</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">updateResolverState</span><span class="p">(</span><span class="nx">ccr</span><span class="p">.</span><span class="nx">curState</span><span class="p">,</span> <span class="kc">nil</span><span class="p">))</span>
+<span class="p">}</span>
+</code></pre></div><p>可见最终会调用 <code>ClientConn.updateResolverState(ccr.curState, nil)</code> 方法，在这个方法里面，gRPC 会处理 Balancer 的逻辑。</p>
+<p>这里需要梳理一下：</p>
+<ul>
+<li>ccResolverWrapper 实现了 <code>resolver.ClientConn</code> 接口</li>
+<li>ccResolverWrapper 中的 cc 是 <code>grpc.ClientConn</code> 结构体</li>
+<li>当在 Resolver 中调用  <code>resolver.ClientConn.UpdateState(state)</code> 的时候，便最终会调用 <code>ClientConn.updateResolverState(ccr.curState, nil)</code></li>
+</ul>
+<p>以 dnsResolver 为例，调用链如下：</p>
+<div class="highlight"><pre class="chroma"><code class="language-sh" data-lang="sh">dnsResovler.watcher --&gt; ccResolverWrapper.UpdateState --&gt; ClientConn.updateResolverState
+--&gt;  cc.balancerWrapper.updateClientConnState
+</code></pre></div><h3 id="clientconnupdateresolverstate">ClientConn.updateResolverState<a href="#clientconnupdateresolverstate" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>updateResolverState 会与 Balancer 模块进行交互：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">cc</span> <span class="o">*</span><span class="nx">ClientConn</span><span class="p">)</span> <span class="nf">updateResolverState</span><span class="p">(</span><span class="nx">s</span> <span class="nx">resolver</span><span class="p">.</span><span class="nx">State</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+	<span class="k">defer</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">firstResolveEvent</span><span class="p">.</span><span class="nf">Fire</span><span class="p">()</span>
+	<span class="nx">cc</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+	<span class="c1">// Check if the ClientConn is already closed. Some fields (e.g.
+</span><span class="c1"></span>	<span class="c1">// balancerWrapper) are set to nil when closing the ClientConn, and could
+</span><span class="c1"></span>	<span class="c1">// cause nil pointer panic if we don&#39;t have this check.
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">conns</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">cc</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+		<span class="k">return</span> <span class="kc">nil</span>
+	<span class="p">}</span>
+
+	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="c1">// May need to apply the initial service config in case the resolver
+</span><span class="c1"></span>		<span class="c1">// doesn&#39;t support service configs, or doesn&#39;t provide a service config
+</span><span class="c1"></span>		<span class="c1">// with the new addresses.
+</span><span class="c1"></span>		<span class="nx">cc</span><span class="p">.</span><span class="nf">maybeApplyDefaultServiceConfig</span><span class="p">(</span><span class="kc">nil</span><span class="p">)</span>
+
+		<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">balancerWrapper</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+			<span class="nx">cc</span><span class="p">.</span><span class="nx">balancerWrapper</span><span class="p">.</span><span class="nf">resolverError</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+		<span class="p">}</span>
+
+		<span class="c1">// No addresses are valid with err set; return early.
+</span><span class="c1"></span>		<span class="nx">cc</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+		<span class="k">return</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">ErrBadResolverState</span>
+	<span class="p">}</span>
+
+	<span class="kd">var</span> <span class="nx">ret</span> <span class="kt">error</span>
+	<span class="c1">// 如果禁用服务配置或者服务配置为空, 则可能使用默认配置
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">dopts</span><span class="p">.</span><span class="nx">disableServiceConfig</span> <span class="o">||</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ServiceConfig</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+    <span class="c1">// A
+</span><span class="c1"></span>		<span class="nx">cc</span><span class="p">.</span><span class="nf">maybeApplyDefaultServiceConfig</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">Addresses</span><span class="p">)</span>
+		<span class="c1">// TODO: do we need to apply a failing LB policy if there is no
+</span><span class="c1"></span>		<span class="c1">// default, per the error handling design?
+</span><span class="c1"></span>	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+    <span class="c1">// B
+</span><span class="c1"></span>		<span class="k">if</span> <span class="nx">sc</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ServiceConfig</span><span class="p">.</span><span class="nx">Config</span><span class="p">.(</span><span class="o">*</span><span class="nx">ServiceConfig</span><span class="p">);</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ServiceConfig</span><span class="p">.</span><span class="nx">Err</span> <span class="o">==</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">ok</span> <span class="p">{</span>
+			<span class="nx">cc</span><span class="p">.</span><span class="nf">applyServiceConfigAndBalancer</span><span class="p">(</span><span class="nx">sc</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nx">Addresses</span><span class="p">)</span>
+		<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+			<span class="c1">// 配置不正确
+</span><span class="c1"></span>			<span class="nx">ret</span> <span class="p">=</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">ErrBadResolverState</span>
+			<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">balancerWrapper</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+				<span class="kd">var</span> <span class="nx">err</span> <span class="kt">error</span>
+				<span class="k">if</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ServiceConfig</span><span class="p">.</span><span class="nx">Err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+					<span class="nx">err</span> <span class="p">=</span> <span class="nx">status</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="nx">codes</span><span class="p">.</span><span class="nx">Unavailable</span><span class="p">,</span> <span class="s">&#34;error parsing service config: %v&#34;</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ServiceConfig</span><span class="p">.</span><span class="nx">Err</span><span class="p">)</span>
+				<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+					<span class="nx">err</span> <span class="p">=</span> <span class="nx">status</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="nx">codes</span><span class="p">.</span><span class="nx">Unavailable</span><span class="p">,</span> <span class="s">&#34;illegal service config type: %T&#34;</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ServiceConfig</span><span class="p">.</span><span class="nx">Config</span><span class="p">)</span>
+				<span class="p">}</span>
+				<span class="nx">cc</span><span class="p">.</span><span class="nx">blockingpicker</span><span class="p">.</span><span class="nf">updatePicker</span><span class="p">(</span><span class="nx">base</span><span class="p">.</span><span class="nf">NewErrPicker</span><span class="p">(</span><span class="nx">err</span><span class="p">))</span>
+				<span class="nx">cc</span><span class="p">.</span><span class="nx">csMgr</span><span class="p">.</span><span class="nf">updateState</span><span class="p">(</span><span class="nx">connectivity</span><span class="p">.</span><span class="nx">TransientFailure</span><span class="p">)</span>
+				<span class="nx">cc</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+				<span class="k">return</span> <span class="nx">ret</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+
+	<span class="kd">var</span> <span class="nx">balCfg</span> <span class="nx">serviceconfig</span><span class="p">.</span><span class="nx">LoadBalancingConfig</span>
+	<span class="c1">// 优先使用客户端配置的负载均衡策略
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">dopts</span><span class="p">.</span><span class="nx">balancerBuilder</span> <span class="o">==</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">lbConfig</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">balCfg</span> <span class="p">=</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">lbConfig</span><span class="p">.</span><span class="nx">cfg</span>
+	<span class="p">}</span>
+
+	<span class="nx">cbn</span> <span class="o">:=</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">curBalancerName</span>
+	<span class="nx">bw</span> <span class="o">:=</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">balancerWrapper</span>
+	<span class="nx">cc</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+	<span class="c1">// 如果负载的负载均衡策略不是 grpclb, 就剔除所有类型是 grpclb 的地址
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">cbn</span> <span class="o">!=</span> <span class="nx">grpclbName</span> <span class="p">{</span>
+		<span class="c1">// Filter any grpclb addresses since we don&#39;t have the grpclb balancer.
+</span><span class="c1"></span>		<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">Addresses</span><span class="p">);</span> <span class="p">{</span>
+			<span class="k">if</span> <span class="nx">s</span><span class="p">.</span><span class="nx">Addresses</span><span class="p">[</span><span class="nx">i</span><span class="p">].</span><span class="nx">Type</span> <span class="o">==</span> <span class="nx">resolver</span><span class="p">.</span><span class="nx">GRPCLB</span> <span class="p">{</span>
+				<span class="nb">copy</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">Addresses</span><span class="p">[</span><span class="nx">i</span><span class="p">:],</span> <span class="nx">s</span><span class="p">.</span><span class="nx">Addresses</span><span class="p">[</span><span class="nx">i</span><span class="o">+</span><span class="mi">1</span><span class="p">:])</span>
+				<span class="nx">s</span><span class="p">.</span><span class="nx">Addresses</span> <span class="p">=</span> <span class="nx">s</span><span class="p">.</span><span class="nx">Addresses</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">Addresses</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+				<span class="k">continue</span>
+			<span class="p">}</span>
+			<span class="nx">i</span><span class="o">++</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+ 	<span class="c1">// 调用负载均衡策略更新连接状态
+</span><span class="c1"></span>	<span class="nx">uccsErr</span> <span class="o">:=</span> <span class="nx">bw</span><span class="p">.</span><span class="nf">updateClientConnState</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">ClientConnState</span><span class="p">{</span><span class="nx">ResolverState</span><span class="p">:</span> <span class="nx">s</span><span class="p">,</span> <span class="nx">BalancerConfig</span><span class="p">:</span> <span class="nx">balCfg</span><span class="p">})</span>
+	<span class="k">if</span> <span class="nx">ret</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">ret</span> <span class="p">=</span> <span class="nx">uccsErr</span> <span class="c1">// prefer ErrBadResolver state since any other error is
+</span><span class="c1"></span>		<span class="c1">// currently meaningless to the caller.
+</span><span class="c1"></span>	<span class="p">}</span>
+	<span class="k">return</span> <span class="nx">ret</span>
+<span class="p">}</span>
+</code></pre></div><p>一般情况下，我们都会进入 A 代码块（使用默认配置）：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">cc</span> <span class="o">*</span><span class="nx">ClientConn</span><span class="p">)</span> <span class="nf">maybeApplyDefaultServiceConfig</span><span class="p">(</span><span class="nx">addrs</span> <span class="p">[]</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span><span class="p">)</span> <span class="p">{</span>
+	<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">cc</span><span class="p">.</span><span class="nf">applyServiceConfigAndBalancer</span><span class="p">(</span><span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">,</span> <span class="nx">addrs</span><span class="p">)</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+	<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">dopts</span><span class="p">.</span><span class="nx">defaultServiceConfig</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">cc</span><span class="p">.</span><span class="nf">applyServiceConfigAndBalancer</span><span class="p">(</span><span class="nx">cc</span><span class="p">.</span><span class="nx">dopts</span><span class="p">.</span><span class="nx">defaultServiceConfig</span><span class="p">,</span> <span class="nx">addrs</span><span class="p">)</span>
+	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+    <span class="c1">// 
+</span><span class="c1"></span>		<span class="nx">cc</span><span class="p">.</span><span class="nf">applyServiceConfigAndBalancer</span><span class="p">(</span><span class="nx">emptyServiceConfig</span><span class="p">,</span> <span class="nx">addrs</span><span class="p">)</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>当我们未指定配置的时候，会传入 <code>emptyServiceConfig</code> 空的配置,  然后调用 <code>ClientConn.applyServiceConfigAndBalancer</code>：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">cc</span> <span class="o">*</span><span class="nx">ClientConn</span><span class="p">)</span> <span class="nf">applyServiceConfigAndBalancer</span><span class="p">(</span><span class="nx">sc</span> <span class="o">*</span><span class="nx">ServiceConfig</span><span class="p">,</span> <span class="nx">addrs</span> <span class="p">[]</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span><span class="p">)</span> <span class="p">{</span>
+	<span class="k">if</span> <span class="nx">sc</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="c1">// should never reach here.
+</span><span class="c1"></span>		<span class="k">return</span>
+	<span class="p">}</span>
+	<span class="c1">// 可能是 emptyServiceConfig
+</span><span class="c1"></span>	<span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span> <span class="p">=</span> <span class="nx">sc</span>
+
+	<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">retryThrottling</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">newThrottler</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">retryThrottler</span><span class="p">{</span>
+			<span class="nx">tokens</span><span class="p">:</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">retryThrottling</span><span class="p">.</span><span class="nx">MaxTokens</span><span class="p">,</span>
+			<span class="nx">max</span><span class="p">:</span>    <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">retryThrottling</span><span class="p">.</span><span class="nx">MaxTokens</span><span class="p">,</span>
+			<span class="nx">thresh</span><span class="p">:</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">retryThrottling</span><span class="p">.</span><span class="nx">MaxTokens</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span>
+			<span class="nx">ratio</span><span class="p">:</span>  <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">retryThrottling</span><span class="p">.</span><span class="nx">TokenRatio</span><span class="p">,</span>
+		<span class="p">}</span>
+		<span class="nx">cc</span><span class="p">.</span><span class="nx">retryThrottler</span><span class="p">.</span><span class="nf">Store</span><span class="p">(</span><span class="nx">newThrottler</span><span class="p">)</span>
+	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+		<span class="nx">cc</span><span class="p">.</span><span class="nx">retryThrottler</span><span class="p">.</span><span class="nf">Store</span><span class="p">((</span><span class="o">*</span><span class="nx">retryThrottler</span><span class="p">)(</span><span class="kc">nil</span><span class="p">))</span>
+	<span class="p">}</span>
+
+  <span class="c1">// 如果没有指定 balancerBuilder, 就需要先获取一个 builder, 一般情况下都会指定
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">dopts</span><span class="p">.</span><span class="nx">balancerBuilder</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="c1">// Only look at balancer types and switch balancer if balancer dial
+</span><span class="c1"></span>		<span class="c1">// option is not set.
+</span><span class="c1"></span>		<span class="kd">var</span> <span class="nx">newBalancerName</span> <span class="kt">string</span>
+		<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">lbConfig</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+      <span class="c1">// 1. 使用 ServiceConfig 指定的 Builder
+</span><span class="c1"></span>			<span class="nx">newBalancerName</span> <span class="p">=</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">lbConfig</span><span class="p">.</span><span class="nx">name</span>
+		<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+			<span class="kd">var</span> <span class="nx">isGRPCLB</span> <span class="kt">bool</span>
+			<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">a</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">addrs</span> <span class="p">{</span>
+				<span class="k">if</span> <span class="nx">a</span><span class="p">.</span><span class="nx">Type</span> <span class="o">==</span> <span class="nx">resolver</span><span class="p">.</span><span class="nx">GRPCLB</span> <span class="p">{</span>
+					<span class="nx">isGRPCLB</span> <span class="p">=</span> <span class="kc">true</span>
+					<span class="k">break</span>
+				<span class="p">}</span>
+			<span class="p">}</span>
+      <span class="c1">// 2. 如果至少有一个地址的类型是 GRPCLB, 那么使用 GRPCLB
+</span><span class="c1"></span>			<span class="k">if</span> <span class="nx">isGRPCLB</span> <span class="p">{</span>
+				<span class="nx">newBalancerName</span> <span class="p">=</span> <span class="nx">grpclbName</span>
+			<span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">LB</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="c1">// 3. 使用 WithBalancer 提供的 builder
+</span><span class="c1"></span>				<span class="nx">newBalancerName</span> <span class="p">=</span> <span class="o">*</span><span class="nx">cc</span><span class="p">.</span><span class="nx">sc</span><span class="p">.</span><span class="nx">LB</span>
+			<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="c1">// 4. 使用 pick_first
+</span><span class="c1"></span>				<span class="nx">newBalancerName</span> <span class="p">=</span> <span class="nx">PickFirstBalancerName</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+    <span class="c1">// 切换负载均衡策略
+</span><span class="c1"></span>		<span class="nx">cc</span><span class="p">.</span><span class="nf">switchBalancer</span><span class="p">(</span><span class="nx">newBalancerName</span><span class="p">)</span>
+	<span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">balancerWrapper</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="c1">// Balancer dial option was set, and this is the first time handling
+</span><span class="c1"></span>		<span class="c1">// resolved addresses. Build a balancer with dopts.balancerBuilder.
+</span><span class="c1"></span>		<span class="nx">cc</span><span class="p">.</span><span class="nx">curBalancerName</span> <span class="p">=</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">dopts</span><span class="p">.</span><span class="nx">balancerBuilder</span><span class="p">.</span><span class="nf">Name</span><span class="p">()</span>
+		<span class="nx">cc</span><span class="p">.</span><span class="nx">balancerWrapper</span> <span class="p">=</span> <span class="nf">newCCBalancerWrapper</span><span class="p">(</span><span class="nx">cc</span><span class="p">,</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">dopts</span><span class="p">.</span><span class="nx">balancerBuilder</span><span class="p">,</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">balancerBuildOpts</span><span class="p">)</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>从上面代码可以看出 ClientConn 会通过服务配置选择对应的 Balancer：</p>
+<ol>
+<li>
+<p>优先使用客户端配置的负载均衡策略</p>
+</li>
+<li>
+<p>如果客户端没有指定负载均衡策略，那么会通过服务配置来决定使用什么负载均衡策略，选择规则如下：</p>
+<ol>
+<li>
+<p>使用 ServiceConfig 指定的负载均衡策略</p>
+</li>
+<li>
+<p>如果至少有一个地址的类型是 GRPCLB, 那么使用 GRPCLB</p>
+</li>
+<li>
+<p>使用 WithBalancer 提供的负载均衡策略， 不过这个选择已经被优化掉了，可以查看字段 LB 上面的注释：</p>
+<blockquote>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// LB is the load balancer the service providers recommends. The balancer
+</span><span class="c1">// specified via grpc.WithBalancerName will override this.  This is deprecated;
+</span><span class="c1">// lbConfigs is preferred.  If lbConfig and LB are both present, lbConfig
+</span><span class="c1">// will be used.
+</span><span class="c1"></span><span class="nx">LB</span> <span class="o">*</span><span class="kt">string</span>
+</code></pre></div></blockquote>
+<p>说明，如果使用了 WithBalancerName 来指定负载均衡策略，那么会覆盖掉这个选项，即会<strong>优先使用客户端配置的负载均衡策略</strong></p>
+</li>
+<li>
+<p>使用 pick_first 负载均衡策略</p>
+</li>
+</ol>
+</li>
+</ol>
+<p>在完成负载均衡策略的初始化或切换之后，会调用<code>bw.updateClientConnState(&amp;balancer.ClientConnState{ResolverState: s, BalancerConfig: balCfg})</code> 来更新连接的状态（bw 就是 balancerWrapper），这个方法在后面会解析。</p>
+<h2 id="4-balancer-分析">4. Balancer 分析<a href="#4-balancer-分析" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>Balancer 包的结构跟 Resolver 的包结构类似，都是采用 Builder + Wrapper 设计模式相结合，使用者只需要实现自己的 Balancer，然后再以插件的形式注册到 gRPC 中就可以与其他模块配合使用。</p>
+<h3 id="newccbalancerwrapper">newCCBalancerWrapper<a href="#newccbalancerwrapper" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>新建一个 ccBalancerWrapper，并且和 ccResolverWrapper 一样，存储到 <code>ClientConn</code> 的 <code>balancerWrapper</code> 中：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">newCCBalancerWrapper</span><span class="p">(</span><span class="nx">cc</span> <span class="o">*</span><span class="nx">ClientConn</span><span class="p">,</span> <span class="nx">b</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">Builder</span><span class="p">,</span> <span class="nx">bopts</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">BuildOptions</span><span class="p">)</span> <span class="o">*</span><span class="nx">ccBalancerWrapper</span> <span class="p">{</span>
+	<span class="c1">// 初始化实例
+</span><span class="c1"></span>  <span class="nx">ccb</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">ccBalancerWrapper</span><span class="p">{</span>
+		<span class="nx">cc</span><span class="p">:</span>       <span class="nx">cc</span><span class="p">,</span>
+		<span class="nx">scBuffer</span><span class="p">:</span> <span class="nx">buffer</span><span class="p">.</span><span class="nf">NewUnbounded</span><span class="p">(),</span>
+		<span class="nx">done</span><span class="p">:</span>     <span class="nx">grpcsync</span><span class="p">.</span><span class="nf">NewEvent</span><span class="p">(),</span>
+		<span class="nx">subConns</span><span class="p">:</span> <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="o">*</span><span class="nx">acBalancerWrapper</span><span class="p">]</span><span class="kd">struct</span><span class="p">{}),</span>
+	<span class="p">}</span>
+  <span class="c1">// 启动协程监听
+</span><span class="c1"></span>	<span class="k">go</span> <span class="nx">ccb</span><span class="p">.</span><span class="nf">watcher</span><span class="p">()</span>
+  <span class="c1">// Build 负载均衡器
+</span><span class="c1"></span>	<span class="nx">ccb</span><span class="p">.</span><span class="nx">balancer</span> <span class="p">=</span> <span class="nx">b</span><span class="p">.</span><span class="nf">Build</span><span class="p">(</span><span class="nx">ccb</span><span class="p">,</span> <span class="nx">bopts</span><span class="p">)</span>
+	<span class="k">return</span> <span class="nx">ccb</span>
+<span class="p">}</span>
+</code></pre></div><h3 id="ccbalancerwrapperwatcher">ccBalancerWrapper.watcher<a href="#ccbalancerwrapperwatcher" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>在创建 ccBalancerWrapper 会启动一个goroutine 来执行 watcher 方法，那 <em>watcher</em> 的作用是什么呢？</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// watcher balancer functions sequentially, so the balancer can be implemented
+</span><span class="c1">// lock-free.
+</span><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">ccb</span> <span class="o">*</span><span class="nx">ccBalancerWrapper</span><span class="p">)</span> <span class="nf">watcher</span><span class="p">()</span> <span class="p">{</span>
+	<span class="k">for</span> <span class="p">{</span>
+		<span class="k">select</span> <span class="p">{</span>
+		<span class="k">case</span> <span class="nx">t</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">ccb</span><span class="p">.</span><span class="nx">scBuffer</span><span class="p">.</span><span class="nf">Get</span><span class="p">():</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">scBuffer</span><span class="p">.</span><span class="nf">Load</span><span class="p">()</span>
+			<span class="k">if</span> <span class="nx">ccb</span><span class="p">.</span><span class="nx">done</span><span class="p">.</span><span class="nf">HasFired</span><span class="p">()</span> <span class="p">{</span>
+				<span class="k">break</span>
+			<span class="p">}</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">balancerMu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+			<span class="nx">su</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.(</span><span class="o">*</span><span class="nx">scStateUpdate</span><span class="p">)</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">balancer</span><span class="p">.</span><span class="nf">UpdateSubConnState</span><span class="p">(</span><span class="nx">su</span><span class="p">.</span><span class="nx">sc</span><span class="p">,</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConnState</span><span class="p">{</span><span class="nx">ConnectivityState</span><span class="p">:</span> <span class="nx">su</span><span class="p">.</span><span class="nx">state</span><span class="p">,</span> <span class="nx">ConnectionError</span><span class="p">:</span> <span class="nx">su</span><span class="p">.</span><span class="nx">err</span><span class="p">})</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">balancerMu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+		<span class="k">case</span> <span class="o">&lt;-</span><span class="nx">ccb</span><span class="p">.</span><span class="nx">done</span><span class="p">.</span><span class="nf">Done</span><span class="p">():</span>
+		<span class="p">}</span>
+
+		<span class="k">if</span> <span class="nx">ccb</span><span class="p">.</span><span class="nx">done</span><span class="p">.</span><span class="nf">HasFired</span><span class="p">()</span> <span class="p">{</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">balancer</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+			<span class="nx">scs</span> <span class="o">:=</span> <span class="nx">ccb</span><span class="p">.</span><span class="nx">subConns</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">subConns</span> <span class="p">=</span> <span class="kc">nil</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+			<span class="k">for</span> <span class="nx">acbw</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">scs</span> <span class="p">{</span>
+				<span class="nx">ccb</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">removeAddrConn</span><span class="p">(</span><span class="nx">acbw</span><span class="p">.</span><span class="nf">getAddrConn</span><span class="p">(),</span> <span class="nx">errConnDrain</span><span class="p">)</span>
+			<span class="p">}</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nf">UpdateState</span><span class="p">(</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">State</span><span class="p">{</span><span class="nx">ConnectivityState</span><span class="p">:</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Connecting</span><span class="p">,</span> <span class="nx">Picker</span><span class="p">:</span> <span class="kc">nil</span><span class="p">})</span>
+			<span class="k">return</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>从代码的注释中，我们可以知道为什么要专门启动一个 goroutine 来执行 watcher 方法：为了监听服务器地址的更新和状态变化，并且让 balancer 实现无锁更新，后文会详细讲解。</p>
+<h3 id="balancerbuilder">balancer.Builder<a href="#balancerbuilder" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>和 Resolver 一样，在实现 Balancer 的组件的同时也要实现一个 Builder，用来构建 Balancer 实例。以 <code>grpclb</code> 负载均衡器为例：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">b</span> <span class="o">*</span><span class="nx">lbBuilder</span><span class="p">)</span> <span class="nf">Build</span><span class="p">(</span><span class="nx">cc</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">ClientConn</span><span class="p">,</span> <span class="nx">opt</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">BuildOptions</span><span class="p">)</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">Balancer</span> <span class="p">{</span>
+	<span class="c1">// This generates a manual resolver builder with a fixed scheme. This
+</span><span class="c1"></span>	<span class="c1">// scheme will be used to dial to remote LB, so we can send filtered
+</span><span class="c1"></span>	<span class="c1">// address updates to remote LB ClientConn using this manual resolver.
+</span><span class="c1"></span>  <span class="c1">// grpclb 内部的 resolver，有特殊用途
+</span><span class="c1"></span>	<span class="nx">r</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">lbManualResolver</span><span class="p">{</span><span class="nx">scheme</span><span class="p">:</span> <span class="s">&#34;grpclb-internal&#34;</span><span class="p">,</span> <span class="nx">ccb</span><span class="p">:</span> <span class="nx">cc</span><span class="p">}</span>
+
+	<span class="nx">lb</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">lbBalancer</span><span class="p">{</span>
+    <span class="c1">// 有缓存功能的 ClientConn wrapper
+</span><span class="c1"></span>		<span class="nx">cc</span><span class="p">:</span>              <span class="nf">newLBCacheClientConn</span><span class="p">(</span><span class="nx">cc</span><span class="p">),</span>
+		<span class="nx">target</span><span class="p">:</span>          <span class="nx">opt</span><span class="p">.</span><span class="nx">Target</span><span class="p">.</span><span class="nx">Endpoint</span><span class="p">,</span>
+		<span class="nx">opt</span><span class="p">:</span>             <span class="nx">opt</span><span class="p">,</span>
+		<span class="nx">fallbackTimeout</span><span class="p">:</span> <span class="nx">b</span><span class="p">.</span><span class="nx">fallbackTimeout</span><span class="p">,</span>
+		<span class="nx">doneCh</span><span class="p">:</span>          <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">{}),</span>
+
+		<span class="nx">manualResolver</span><span class="p">:</span> <span class="nx">r</span><span class="p">,</span>
+		<span class="nx">subConns</span><span class="p">:</span>       <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span><span class="p">]</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConn</span><span class="p">),</span>
+		<span class="nx">scStates</span><span class="p">:</span>       <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConn</span><span class="p">]</span><span class="nx">connectivity</span><span class="p">.</span><span class="nx">State</span><span class="p">),</span>
+    <span class="c1">// 初始化 picker
+</span><span class="c1"></span>		<span class="nx">picker</span><span class="p">:</span>         <span class="o">&amp;</span><span class="nx">errPicker</span><span class="p">{</span><span class="nx">err</span><span class="p">:</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">ErrNoSubConnAvailable</span><span class="p">},</span>
+		<span class="nx">clientStats</span><span class="p">:</span>    <span class="nf">newRPCStats</span><span class="p">(),</span>
+		<span class="nx">backoff</span><span class="p">:</span>        <span class="nx">backoff</span><span class="p">.</span><span class="nx">DefaultExponential</span><span class="p">,</span> <span class="c1">// TODO: make backoff configurable.
+</span><span class="c1"></span>	<span class="p">}</span>
+
+	<span class="o">...</span>
+
+	<span class="k">return</span> <span class="nx">lb</span>
+<span class="p">}</span>
+</code></pre></div><h3 id="balancer-接口">Balancer 接口<a href="#balancer-接口" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>我们再来看看 Balancer 都有哪些方法：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// Balancer takes input from gRPC, manages SubConns, and collects and aggregates
+</span><span class="c1">// the connectivity states.
+</span><span class="c1">//
+</span><span class="c1">// It also generates and updates the Picker used by gRPC to pick SubConns for RPCs.
+</span><span class="c1">//
+</span><span class="c1">// UpdateClientConnState, ResolverError, UpdateSubConnState, and Close are
+</span><span class="c1">// guaranteed to be called synchronously from the same goroutine.  There&#39;s no
+</span><span class="c1">// guarantee on picker.Pick, it may be called anytime.
+</span><span class="c1"></span><span class="kd">type</span> <span class="nx">Balancer</span> <span class="kd">interface</span> <span class="p">{</span>
+	<span class="c1">// 当 ClientConn 的状态发生变化时, gRPC 会调用这个方法
+</span><span class="c1"></span>	<span class="c1">// 如果返回的错误是ErrBadResolverState, ClientConn 会立即以指数退避的方式调用 Resolver 的 ResolveNow 方法,
+</span><span class="c1"></span>	<span class="c1">// 直到调用 UpdateClientConnState 返回 nil
+</span><span class="c1"></span>	<span class="nf">UpdateClientConnState</span><span class="p">(</span><span class="nx">ClientConnState</span><span class="p">)</span> <span class="kt">error</span>
+	<span class="c1">// 当 resolver 解析发生错误时, gRPC 会调用这个方法
+</span><span class="c1"></span>	<span class="nf">ResolverError</span><span class="p">(</span><span class="kt">error</span><span class="p">)</span>
+	<span class="c1">// 当子连接状态发生变化时，gRPC 会调用这个方法
+</span><span class="c1"></span>	<span class="nf">UpdateSubConnState</span><span class="p">(</span><span class="nx">SubConn</span><span class="p">,</span> <span class="nx">SubConnState</span><span class="p">)</span>
+	
+	<span class="nf">Close</span><span class="p">()</span>
+<span class="p">}</span>
+</code></pre></div><h3 id="lbbalancerupdateclientconnstate">lbBalancer.UpdateClientConnState<a href="#lbbalancerupdateclientconnstate" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>UpdateClientConnState 是如何被调用的呢？原来是通过前文提到的 <code>bw.updateClientConnState</code> 来间接调用的，由 Resolver 到 ClientConn，再到 Balancer，在下面的调用链中一览无余：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="nx">ccResolverWrapper</span><span class="p">.</span><span class="nx">UpdateState</span> <span class="o">-</span><span class="p">&gt;</span> <span class="nx">ClientConn</span><span class="p">.</span><span class="nx">updateResolverState</span> <span class="o">-</span><span class="p">&gt;</span> <span class="nx">ccBalancerWrapper</span><span class="p">.</span><span class="nx">updateClientConnState</span> <span class="o">-</span><span class="p">&gt;</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">Balancer</span><span class="p">.</span><span class="nx">UpdateClientConnState</span>
+</code></pre></div><p>上面的调用关系中不涉及到具体的实现，我们来看看 <code>lbBalancer.UpdateClientConnState</code> 是如何实现的：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">lb</span> <span class="o">*</span><span class="nx">lbBalancer</span><span class="p">)</span> <span class="nf">UpdateClientConnState</span><span class="p">(</span><span class="nx">ccs</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">ClientConnState</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+	<span class="k">if</span> <span class="nx">logger</span><span class="p">.</span><span class="nf">V</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="p">{</span>
+		<span class="nx">logger</span><span class="p">.</span><span class="nf">Infof</span><span class="p">(</span><span class="s">&#34;lbBalancer: UpdateClientConnState: %+v&#34;</span><span class="p">,</span> <span class="nx">ccs</span><span class="p">)</span>
+	<span class="p">}</span>
+	<span class="c1">// 处理 balancer 配置
+</span><span class="c1"></span>	<span class="nx">gc</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">ccs</span><span class="p">.</span><span class="nx">BalancerConfig</span><span class="p">.(</span><span class="o">*</span><span class="nx">grpclbServiceConfig</span><span class="p">)</span>
+	<span class="nx">lb</span><span class="p">.</span><span class="nf">handleServiceConfig</span><span class="p">(</span><span class="nx">gc</span><span class="p">)</span>
+
+	<span class="nx">addrs</span> <span class="o">:=</span> <span class="nx">ccs</span><span class="p">.</span><span class="nx">ResolverState</span><span class="p">.</span><span class="nx">Addresses</span>
+
+	<span class="c1">// 区分地址的类型, 并且把 GRPCLB 类型的地址改为了 Backend
+</span><span class="c1"></span>	<span class="kd">var</span> <span class="nx">remoteBalancerAddrs</span><span class="p">,</span> <span class="nx">backendAddrs</span> <span class="p">[]</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span>
+	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">a</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">addrs</span> <span class="p">{</span>
+		<span class="k">if</span> <span class="nx">a</span><span class="p">.</span><span class="nx">Type</span> <span class="o">==</span> <span class="nx">resolver</span><span class="p">.</span><span class="nx">GRPCLB</span> <span class="p">{</span>
+			<span class="nx">a</span><span class="p">.</span><span class="nx">Type</span> <span class="p">=</span> <span class="nx">resolver</span><span class="p">.</span><span class="nx">Backend</span>
+			<span class="nx">remoteBalancerAddrs</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">remoteBalancerAddrs</span><span class="p">,</span> <span class="nx">a</span><span class="p">)</span>
+		<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+			<span class="nx">backendAddrs</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">backendAddrs</span><span class="p">,</span> <span class="nx">a</span><span class="p">)</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+	<span class="k">if</span> <span class="nx">sd</span> <span class="o">:=</span> <span class="nx">grpclbstate</span><span class="p">.</span><span class="nf">Get</span><span class="p">(</span><span class="nx">ccs</span><span class="p">.</span><span class="nx">ResolverState</span><span class="p">);</span> <span class="nx">sd</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="c1">// Override any balancer addresses provided via
+</span><span class="c1"></span>		<span class="c1">// ccs.ResolverState.Addresses.
+</span><span class="c1"></span>		<span class="nx">remoteBalancerAddrs</span> <span class="p">=</span> <span class="nx">sd</span><span class="p">.</span><span class="nx">BalancerAddresses</span>
+	<span class="p">}</span>
+
+	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">backendAddrs</span><span class="p">)</span><span class="o">+</span><span class="nb">len</span><span class="p">(</span><span class="nx">remoteBalancerAddrs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+		<span class="c1">// There should be at least one address, either grpclb server or
+</span><span class="c1"></span>		<span class="c1">// fallback. Empty address is not valid.
+</span><span class="c1"></span>		<span class="k">return</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">ErrBadResolverState</span>
+	<span class="p">}</span>
+
+	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">remoteBalancerAddrs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+		<span class="k">if</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">ccRemoteLB</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+			<span class="nx">lb</span><span class="p">.</span><span class="nx">ccRemoteLB</span><span class="p">.</span><span class="nb">close</span><span class="p">()</span>
+			<span class="nx">lb</span><span class="p">.</span><span class="nx">ccRemoteLB</span> <span class="p">=</span> <span class="kc">nil</span>
+		<span class="p">}</span>
+	<span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">ccRemoteLB</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="c1">// 第一次收到解析到的 remoteBalancerAddrs 地址, 建立与远程负载均衡器的连接
+</span><span class="c1"></span>		<span class="nx">lb</span><span class="p">.</span><span class="nf">newRemoteBalancerCCWrapper</span><span class="p">()</span>
+		<span class="c1">// Start the fallback goroutine.
+</span><span class="c1"></span>		<span class="k">go</span> <span class="nx">lb</span><span class="p">.</span><span class="nf">fallbackToBackendsAfter</span><span class="p">(</span><span class="nx">lb</span><span class="p">.</span><span class="nx">fallbackTimeout</span><span class="p">)</span>
+	<span class="p">}</span>
+
+	<span class="k">if</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">ccRemoteLB</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="c1">// cc to remote balancers uses lb.manualResolver. Send the updated remote
+</span><span class="c1"></span>		<span class="c1">// balancer addresses to it through manualResolver.
+</span><span class="c1"></span>		<span class="nx">lb</span><span class="p">.</span><span class="nx">manualResolver</span><span class="p">.</span><span class="nf">UpdateState</span><span class="p">(</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">State</span><span class="p">{</span><span class="nx">Addresses</span><span class="p">:</span> <span class="nx">remoteBalancerAddrs</span><span class="p">})</span>
+	<span class="p">}</span>
+
+	<span class="nx">lb</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+	<span class="nx">lb</span><span class="p">.</span><span class="nx">resolvedBackendAddrs</span> <span class="p">=</span> <span class="nx">backendAddrs</span>
+	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">remoteBalancerAddrs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">||</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">inFallback</span> <span class="p">{</span>
+		<span class="c1">// If there&#39;s no remote balancer address in ClientConn update, grpclb
+</span><span class="c1"></span>		<span class="c1">// enters fallback mode immediately.
+</span><span class="c1"></span>		<span class="c1">//
+</span><span class="c1"></span>		<span class="c1">// If a new update is received while grpclb is in fallback, update the
+</span><span class="c1"></span>		<span class="c1">// list of backends being used to the new fallback backends.
+</span><span class="c1"></span>		<span class="nx">lb</span><span class="p">.</span><span class="nf">refreshSubConns</span><span class="p">(</span><span class="nx">lb</span><span class="p">.</span><span class="nx">resolvedBackendAddrs</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">usePickFirst</span><span class="p">)</span>
+	<span class="p">}</span>
+	<span class="nx">lb</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+	<span class="k">return</span> <span class="kc">nil</span>
+<span class="p">}</span>
+</code></pre></div><p>lbBalancer 把地址分为两种类型：<code>resolver.GRPCLB</code>，<code>resolver.Backend</code>。当 dnsResolver 传过来的地址列表中有 resolver.GRPCLB，lbBalancer 会与<code>resolver.GRPCLB</code>的负载均衡器建立连接以获取真正服务的地址。不过，我们在这里并不做深究。</p>
+<h3 id="lbbalancernewremotebalancerccwrapper">lbBalancer.newRemoteBalancerCCWrapper<a href="#lbbalancernewremotebalancerccwrapper" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">lb</span> <span class="o">*</span><span class="nx">lbBalancer</span><span class="p">)</span> <span class="nf">refreshSubConns</span><span class="p">(</span><span class="nx">backendAddrs</span> <span class="p">[]</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span><span class="p">,</span> <span class="nx">fallback</span> <span class="kt">bool</span><span class="p">,</span> <span class="nx">pickFirst</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+	<span class="nx">opts</span> <span class="o">:=</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">NewSubConnOptions</span><span class="p">{}</span>
+	<span class="k">if</span> <span class="p">!</span><span class="nx">fallback</span> <span class="p">{</span>
+		<span class="nx">opts</span><span class="p">.</span><span class="nx">CredsBundle</span> <span class="p">=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">grpclbBackendCreds</span>
+	<span class="p">}</span>
+
+	<span class="c1">// 更新后端地址
+</span><span class="c1"></span>	<span class="nx">lb</span><span class="p">.</span><span class="nx">backendAddrs</span> <span class="p">=</span> <span class="nx">backendAddrs</span>
+	<span class="nx">lb</span><span class="p">.</span><span class="nx">backendAddrsWithoutMetadata</span> <span class="p">=</span> <span class="kc">nil</span>
+
+	<span class="nx">fallbackModeChanged</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">inFallback</span> <span class="o">!=</span> <span class="nx">fallback</span>
+	<span class="nx">lb</span><span class="p">.</span><span class="nx">inFallback</span> <span class="p">=</span> <span class="nx">fallback</span>
+	<span class="k">if</span> <span class="nx">fallbackModeChanged</span> <span class="o">&amp;&amp;</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">inFallback</span> <span class="p">{</span>
+		<span class="c1">// Clear previous received list when entering fallback, so if the server
+</span><span class="c1"></span>		<span class="c1">// comes back and sends the same list again, the new addresses will be
+</span><span class="c1"></span>		<span class="c1">// used.
+</span><span class="c1"></span>		<span class="nx">lb</span><span class="p">.</span><span class="nx">fullServerList</span> <span class="p">=</span> <span class="kc">nil</span>
+	<span class="p">}</span>
+
+	<span class="c1">// 判断选取策略是否变化，获取第一个可用连接
+</span><span class="c1"></span>	<span class="nx">balancingPolicyChanged</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">usePickFirst</span> <span class="o">!=</span> <span class="nx">pickFirst</span>
+	<span class="nx">oldUsePickFirst</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">usePickFirst</span>
+	<span class="nx">lb</span><span class="p">.</span><span class="nx">usePickFirst</span> <span class="p">=</span> <span class="nx">pickFirst</span>
+
+	<span class="k">if</span> <span class="nx">fallbackModeChanged</span> <span class="o">||</span> <span class="nx">balancingPolicyChanged</span> <span class="p">{</span>
+		<span class="c1">// 如果策略发生变化，删除所有的已经建立的连接
+</span><span class="c1"></span>		<span class="k">for</span> <span class="nx">a</span><span class="p">,</span> <span class="nx">sc</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">subConns</span> <span class="p">{</span>
+			<span class="k">if</span> <span class="nx">oldUsePickFirst</span> <span class="p">{</span>
+				<span class="c1">// If old SubConn were created for pickfirst, bypass cache and
+</span><span class="c1"></span>				<span class="c1">// remove directly.
+</span><span class="c1"></span>				<span class="nx">lb</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">RemoveSubConn</span><span class="p">(</span><span class="nx">sc</span><span class="p">)</span>
+			<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+				<span class="nx">lb</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">RemoveSubConn</span><span class="p">(</span><span class="nx">sc</span><span class="p">)</span>
+			<span class="p">}</span>
+			<span class="nb">delete</span><span class="p">(</span><span class="nx">lb</span><span class="p">.</span><span class="nx">subConns</span><span class="p">,</span> <span class="nx">a</span><span class="p">)</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+	<span class="c1">// 使用 pickFirst 策略,只需要获取一个子连接就 ok 了
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">usePickFirst</span> <span class="p">{</span>
+		<span class="kd">var</span> <span class="nx">sc</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConn</span>
+		<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">sc</span> <span class="p">=</span> <span class="k">range</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">subConns</span> <span class="p">{</span>
+			<span class="k">break</span>
+		<span class="p">}</span>
+		<span class="c1">// 更新后端服务地址并触发连接
+</span><span class="c1"></span>		<span class="k">if</span> <span class="nx">sc</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+			<span class="nx">sc</span><span class="p">.</span><span class="nf">UpdateAddresses</span><span class="p">(</span><span class="nx">backendAddrs</span><span class="p">)</span>
+			<span class="nx">sc</span><span class="p">.</span><span class="nf">Connect</span><span class="p">()</span>
+			<span class="k">return</span>
+		<span class="p">}</span>
+		<span class="c1">// This bypasses the cc wrapper with SubConn cache.
+</span><span class="c1"></span>		<span class="c1">// 新建一个 SubConn, 并连接
+</span><span class="c1"></span>		<span class="nx">sc</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">NewSubConn</span><span class="p">(</span><span class="nx">backendAddrs</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+		<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+			<span class="nx">logger</span><span class="p">.</span><span class="nf">Warningf</span><span class="p">(</span><span class="s">&#34;grpclb: failed to create new SubConn: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+			<span class="k">return</span>
+		<span class="p">}</span>
+		<span class="nx">sc</span><span class="p">.</span><span class="nf">Connect</span><span class="p">()</span>
+		<span class="nx">lb</span><span class="p">.</span><span class="nx">subConns</span><span class="p">[</span><span class="nx">backendAddrs</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="p">=</span> <span class="nx">sc</span>
+		<span class="nx">lb</span><span class="p">.</span><span class="nx">scStates</span><span class="p">[</span><span class="nx">sc</span><span class="p">]</span> <span class="p">=</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Idle</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+
+	<span class="c1">// addrsSet is the set converted from backendAddrsWithoutMetadata, it&#39;s used to quick
+</span><span class="c1"></span>	<span class="c1">// lookup for an address.
+</span><span class="c1"></span>	<span class="nx">addrsSet</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span><span class="p">]</span><span class="kd">struct</span><span class="p">{})</span>
+	<span class="c1">// Create new SubConns.
+</span><span class="c1"></span>	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">addr</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">backendAddrs</span> <span class="p">{</span>
+		<span class="nx">addrWithoutMD</span> <span class="o">:=</span> <span class="nx">addr</span>
+		<span class="nx">addrWithoutMD</span><span class="p">.</span><span class="nx">Metadata</span> <span class="p">=</span> <span class="kc">nil</span>
+		<span class="nx">addrsSet</span><span class="p">[</span><span class="nx">addrWithoutMD</span><span class="p">]</span> <span class="p">=</span> <span class="kd">struct</span><span class="p">{}{}</span>
+		<span class="nx">lb</span><span class="p">.</span><span class="nx">backendAddrsWithoutMetadata</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">lb</span><span class="p">.</span><span class="nx">backendAddrsWithoutMetadata</span><span class="p">,</span> <span class="nx">addrWithoutMD</span><span class="p">)</span>
+
+		<span class="k">if</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">subConns</span><span class="p">[</span><span class="nx">addrWithoutMD</span><span class="p">];</span> <span class="p">!</span><span class="nx">ok</span> <span class="p">{</span>
+			<span class="c1">// Use addrWithMD to create the SubConn.
+</span><span class="c1"></span>			<span class="nx">sc</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">NewSubConn</span><span class="p">([]</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span><span class="p">{</span><span class="nx">addr</span><span class="p">},</span> <span class="nx">opts</span><span class="p">)</span>
+			<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+				<span class="nx">logger</span><span class="p">.</span><span class="nf">Warningf</span><span class="p">(</span><span class="s">&#34;grpclb: failed to create new SubConn: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+				<span class="k">continue</span>
+			<span class="p">}</span>
+			<span class="nx">lb</span><span class="p">.</span><span class="nx">subConns</span><span class="p">[</span><span class="nx">addrWithoutMD</span><span class="p">]</span> <span class="p">=</span> <span class="nx">sc</span> <span class="c1">// Use the addr without MD as key for the map.
+</span><span class="c1"></span>			<span class="k">if</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">scStates</span><span class="p">[</span><span class="nx">sc</span><span class="p">];</span> <span class="p">!</span><span class="nx">ok</span> <span class="p">{</span>
+				<span class="c1">// Only set state of new sc to IDLE. The state could already be
+</span><span class="c1"></span>				<span class="c1">// READY for cached SubConns.
+</span><span class="c1"></span>				<span class="nx">lb</span><span class="p">.</span><span class="nx">scStates</span><span class="p">[</span><span class="nx">sc</span><span class="p">]</span> <span class="p">=</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Idle</span>
+			<span class="p">}</span>
+			<span class="nx">sc</span><span class="p">.</span><span class="nf">Connect</span><span class="p">()</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+
+	<span class="k">for</span> <span class="nx">a</span><span class="p">,</span> <span class="nx">sc</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">subConns</span> <span class="p">{</span>
+		<span class="c1">// a was removed by resolver.
+</span><span class="c1"></span>		<span class="k">if</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">addrsSet</span><span class="p">[</span><span class="nx">a</span><span class="p">];</span> <span class="p">!</span><span class="nx">ok</span> <span class="p">{</span>
+			<span class="nx">lb</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">RemoveSubConn</span><span class="p">(</span><span class="nx">sc</span><span class="p">)</span>
+			<span class="nb">delete</span><span class="p">(</span><span class="nx">lb</span><span class="p">.</span><span class="nx">subConns</span><span class="p">,</span> <span class="nx">a</span><span class="p">)</span>
+			<span class="c1">// Keep the state of this sc in b.scStates until sc&#39;s state becomes Shutdown.
+</span><span class="c1"></span>			<span class="c1">// The entry will be deleted in UpdateSubConnState.
+</span><span class="c1"></span>		<span class="p">}</span>
+	<span class="p">}</span>
+
+	<span class="c1">// Regenerate and update picker after refreshing subconns because with
+</span><span class="c1"></span>	<span class="c1">// cache, even if SubConn was newed/removed, there might be no state
+</span><span class="c1"></span>	<span class="c1">// changes (the subconn will be kept in cache, not actually
+</span><span class="c1"></span>	<span class="c1">// newed/removed).
+</span><span class="c1"></span>	<span class="c1">// 更新 lb 的状态, 并且重新生成 Picker
+</span><span class="c1"></span>	<span class="nx">lb</span><span class="p">.</span><span class="nf">updateStateAndPicker</span><span class="p">(</span><span class="kc">true</span><span class="p">,</span> <span class="kc">true</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div><h3 id="lbbalancerupdatestateandpicker">lbBalancer.updateStateAndPicker<a href="#lbbalancerupdatestateandpicker" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">lb</span> <span class="o">*</span><span class="nx">lbBalancer</span><span class="p">)</span> <span class="nf">updateStateAndPicker</span><span class="p">(</span><span class="nx">forceRegeneratePicker</span> <span class="kt">bool</span><span class="p">,</span> <span class="nx">resetDrop</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+	<span class="nx">oldAggrState</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">state</span>
+	<span class="nx">lb</span><span class="p">.</span><span class="nx">state</span> <span class="p">=</span> <span class="nx">lb</span><span class="p">.</span><span class="nf">aggregateSubConnStates</span><span class="p">()</span>
+	<span class="c1">// Regenerate picker when one of the following happens:
+</span><span class="c1"></span>	<span class="c1">//  - caller wants to regenerate
+</span><span class="c1"></span>	<span class="c1">//  - the aggregated state changed
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">forceRegeneratePicker</span> <span class="o">||</span> <span class="p">(</span><span class="nx">lb</span><span class="p">.</span><span class="nx">state</span> <span class="o">!=</span> <span class="nx">oldAggrState</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// 重新生成 picker
+</span><span class="c1"></span>		<span class="nx">lb</span><span class="p">.</span><span class="nf">regeneratePicker</span><span class="p">(</span><span class="nx">resetDrop</span><span class="p">)</span>
+	<span class="p">}</span>
+
+	<span class="nx">lb</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">UpdateState</span><span class="p">(</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">State</span><span class="p">{</span><span class="nx">ConnectivityState</span><span class="p">:</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">state</span><span class="p">,</span> <span class="nx">Picker</span><span class="p">:</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">picker</span><span class="p">})</span>
+<span class="p">}</span>
+</code></pre></div><h3 id="lbbalancerregeneratepicker">lbBalancer.regeneratePicker<a href="#lbbalancerregeneratepicker" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">lb</span> <span class="o">*</span><span class="nx">lbBalancer</span><span class="p">)</span> <span class="nf">regeneratePicker</span><span class="p">(</span><span class="nx">resetDrop</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+  <span class="c1">// 创建 errpicker
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">state</span> <span class="o">==</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">TransientFailure</span> <span class="p">{</span>
+		<span class="nx">lb</span><span class="p">.</span><span class="nx">picker</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">errPicker</span><span class="p">{</span><span class="nx">err</span><span class="p">:</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">ErrTransientFailure</span><span class="p">}</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+	<span class="c1">// 创建 errpicker
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">state</span> <span class="o">==</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Connecting</span> <span class="p">{</span>
+		<span class="nx">lb</span><span class="p">.</span><span class="nx">picker</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">errPicker</span><span class="p">{</span><span class="nx">err</span><span class="p">:</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">ErrNoSubConnAvailable</span><span class="p">}</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+	
+  <span class="c1">// 如果是 pickFirst， 则获取第一个 subConn 就行了
+</span><span class="c1"></span>	<span class="kd">var</span> <span class="nx">readySCs</span> <span class="p">[]</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConn</span>
+	<span class="k">if</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">usePickFirst</span> <span class="p">{</span>
+		<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">sc</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">subConns</span> <span class="p">{</span>
+			<span class="nx">readySCs</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">readySCs</span><span class="p">,</span> <span class="nx">sc</span><span class="p">)</span>
+			<span class="k">break</span>
+		<span class="p">}</span>
+	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+		<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">a</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">backendAddrsWithoutMetadata</span> <span class="p">{</span>
+			<span class="k">if</span> <span class="nx">sc</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">subConns</span><span class="p">[</span><span class="nx">a</span><span class="p">];</span> <span class="nx">ok</span> <span class="p">{</span>
+				<span class="k">if</span> <span class="nx">st</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">scStates</span><span class="p">[</span><span class="nx">sc</span><span class="p">];</span> <span class="nx">ok</span> <span class="o">&amp;&amp;</span> <span class="nx">st</span> <span class="o">==</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Ready</span> <span class="p">{</span>
+					<span class="nx">readySCs</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">readySCs</span><span class="p">,</span> <span class="nx">sc</span><span class="p">)</span>
+				<span class="p">}</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+	
+	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">readySCs</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="p">{</span>
+		<span class="c1">// If there&#39;s no ready SubConns, always re-pick. This is to avoid drops
+</span><span class="c1"></span>		<span class="c1">// unless at least one SubConn is ready. Otherwise we may drop more
+</span><span class="c1"></span>		<span class="c1">// often than want because of drops + re-picks(which become re-drops).
+</span><span class="c1"></span>		<span class="c1">//
+</span><span class="c1"></span>		<span class="c1">// This doesn&#39;t seem to be necessary after the connecting check above.
+</span><span class="c1"></span>		<span class="c1">// Kept for safety.
+</span><span class="c1"></span>		<span class="nx">lb</span><span class="p">.</span><span class="nx">picker</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">errPicker</span><span class="p">{</span><span class="nx">err</span><span class="p">:</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">ErrNoSubConnAvailable</span><span class="p">}</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+  <span class="c1">// 如果是 fallback，则使用 RoundRobin
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">inFallback</span> <span class="p">{</span>
+		<span class="nx">lb</span><span class="p">.</span><span class="nx">picker</span> <span class="p">=</span> <span class="nf">newRRPicker</span><span class="p">(</span><span class="nx">readySCs</span><span class="p">)</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+  <span class="c1">// 如果是需要重置，创建新的 Picker
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">resetDrop</span> <span class="p">{</span>
+		<span class="nx">lb</span><span class="p">.</span><span class="nx">picker</span> <span class="p">=</span> <span class="nf">newLBPicker</span><span class="p">(</span><span class="nx">lb</span><span class="p">.</span><span class="nx">fullServerList</span><span class="p">,</span> <span class="nx">readySCs</span><span class="p">,</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">clientStats</span><span class="p">)</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+  <span class="c1">// 原来的 Picker 不是 lbPicker，创建新 Picker
+</span><span class="c1"></span>	<span class="nx">prevLBPicker</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">picker</span><span class="p">.(</span><span class="o">*</span><span class="nx">lbPicker</span><span class="p">)</span>
+	<span class="k">if</span> <span class="p">!</span><span class="nx">ok</span> <span class="p">{</span>
+		<span class="nx">lb</span><span class="p">.</span><span class="nx">picker</span> <span class="p">=</span> <span class="nf">newLBPicker</span><span class="p">(</span><span class="nx">lb</span><span class="p">.</span><span class="nx">fullServerList</span><span class="p">,</span> <span class="nx">readySCs</span><span class="p">,</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">clientStats</span><span class="p">)</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+  <span class="c1">// 更新 SubConn
+</span><span class="c1"></span>	<span class="nx">prevLBPicker</span><span class="p">.</span><span class="nf">updateReadySCs</span><span class="p">(</span><span class="nx">readySCs</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div><h2 id="5-后端服务建立连接">5. 后端服务建立连接<a href="#5-后端服务建立连接" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>虽然前面剖析了 Balancer 的实现原理，但我们却并不知道与后端服务的连接是在哪里建立的，答案就在 <code>ClientConn.NewSubConn</code>中：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">ccb</span> <span class="o">*</span><span class="nx">ccBalancerWrapper</span><span class="p">)</span> <span class="nf">NewSubConn</span><span class="p">(</span><span class="nx">addrs</span> <span class="p">[]</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span><span class="p">,</span> <span class="nx">opts</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">NewSubConnOptions</span><span class="p">)</span> <span class="p">(</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConn</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">addrs</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;grpc: cannot create SubConn with empty address list&#34;</span><span class="p">)</span>
+	<span class="p">}</span>
+	<span class="nx">ccb</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+	<span class="k">defer</span> <span class="nx">ccb</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+	<span class="k">if</span> <span class="nx">ccb</span><span class="p">.</span><span class="nx">subConns</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;grpc: ClientConn balancer wrapper was closed&#34;</span><span class="p">)</span>
+	<span class="p">}</span>
+  <span class="c1">// 调用 grpc.ClientConn.newAddrConn 来创建于后端服务的连接
+</span><span class="c1"></span>	<span class="nx">ac</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">ccb</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">newAddrConn</span><span class="p">(</span><span class="nx">addrs</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span>
+	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">err</span>
+	<span class="p">}</span>
+	<span class="nx">acbw</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">acBalancerWrapper</span><span class="p">{</span><span class="nx">ac</span><span class="p">:</span> <span class="nx">ac</span><span class="p">}</span>
+	<span class="nx">acbw</span><span class="p">.</span><span class="nx">ac</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+	<span class="nx">ac</span><span class="p">.</span><span class="nx">acbw</span> <span class="p">=</span> <span class="nx">acbw</span>
+	<span class="nx">acbw</span><span class="p">.</span><span class="nx">ac</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+  <span class="c1">// 
+</span><span class="c1"></span>	<span class="nx">ccb</span><span class="p">.</span><span class="nx">subConns</span><span class="p">[</span><span class="nx">acbw</span><span class="p">]</span> <span class="p">=</span> <span class="kd">struct</span><span class="p">{}{}</span>
+	<span class="k">return</span> <span class="nx">acbw</span><span class="p">,</span> <span class="kc">nil</span>
+<span class="p">}</span>
+</code></pre></div><p>在 NewSubConn 中会调用 <code>cc.newAddrConn</code> 来建立连接对象 <code>acBalancerWrapper</code> 并把它添加到 ClientConn 的 conns 连接池中，但是并没有真正建立连接，而只是初始化了连接状态为 <code>Idle</code>，然后返回了连接的实例：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// newAddrConn creates an addrConn for addrs and adds it to cc.conns.
+</span><span class="c1">//
+</span><span class="c1">// Caller needs to make sure len(addrs) &gt; 0.
+</span><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">cc</span> <span class="o">*</span><span class="nx">ClientConn</span><span class="p">)</span> <span class="nf">newAddrConn</span><span class="p">(</span><span class="nx">addrs</span> <span class="p">[]</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span><span class="p">,</span> <span class="nx">opts</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">NewSubConnOptions</span><span class="p">)</span> <span class="p">(</span><span class="o">*</span><span class="nx">addrConn</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+	<span class="nx">ac</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">addrConn</span><span class="p">{</span>
+		<span class="nx">state</span><span class="p">:</span>        <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Idle</span><span class="p">,</span>	<span class="c1">// 初始化状态为 Idle
+</span><span class="c1"></span>		<span class="nx">cc</span><span class="p">:</span>           <span class="nx">cc</span><span class="p">,</span>
+		<span class="nx">addrs</span><span class="p">:</span>        <span class="nx">addrs</span><span class="p">,</span>
+		<span class="nx">scopts</span><span class="p">:</span>       <span class="nx">opts</span><span class="p">,</span>
+		<span class="nx">dopts</span><span class="p">:</span>        <span class="nx">cc</span><span class="p">.</span><span class="nx">dopts</span><span class="p">,</span>
+		<span class="nx">czData</span><span class="p">:</span>       <span class="nb">new</span><span class="p">(</span><span class="nx">channelzData</span><span class="p">),</span>
+		<span class="nx">resetBackoff</span><span class="p">:</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">{}),</span>
+	<span class="p">}</span>
+	<span class="nx">ac</span><span class="p">.</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">ac</span><span class="p">.</span><span class="nx">cancel</span> <span class="p">=</span> <span class="nx">context</span><span class="p">.</span><span class="nf">WithCancel</span><span class="p">(</span><span class="nx">cc</span><span class="p">.</span><span class="nx">ctx</span><span class="p">)</span>
+	<span class="c1">// Track ac in cc. This needs to be done before any getTransport(...) is called.
+</span><span class="c1"></span>	<span class="nx">cc</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+	<span class="k">if</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">conns</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">cc</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">ErrClientConnClosing</span>
+	<span class="p">}</span>
+	<span class="k">if</span> <span class="nx">channelz</span><span class="p">.</span><span class="nf">IsOn</span><span class="p">()</span> <span class="p">{</span>
+		<span class="nx">ac</span><span class="p">.</span><span class="nx">channelzID</span> <span class="p">=</span> <span class="nx">channelz</span><span class="p">.</span><span class="nf">RegisterSubChannel</span><span class="p">(</span><span class="nx">ac</span><span class="p">,</span> <span class="nx">cc</span><span class="p">.</span><span class="nx">channelzID</span><span class="p">,</span> <span class="s">&#34;&#34;</span><span class="p">)</span>
+		<span class="nx">channelz</span><span class="p">.</span><span class="nf">AddTraceEvent</span><span class="p">(</span><span class="nx">logger</span><span class="p">,</span> <span class="nx">ac</span><span class="p">.</span><span class="nx">channelzID</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">channelz</span><span class="p">.</span><span class="nx">TraceEventDesc</span><span class="p">{</span>
+			<span class="nx">Desc</span><span class="p">:</span>     <span class="s">&#34;Subchannel Created&#34;</span><span class="p">,</span>
+			<span class="nx">Severity</span><span class="p">:</span> <span class="nx">channelz</span><span class="p">.</span><span class="nx">CtInfo</span><span class="p">,</span>
+			<span class="nx">Parent</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">channelz</span><span class="p">.</span><span class="nx">TraceEventDesc</span><span class="p">{</span>
+				<span class="nx">Desc</span><span class="p">:</span>     <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;Subchannel(id:%d) created&#34;</span><span class="p">,</span> <span class="nx">ac</span><span class="p">.</span><span class="nx">channelzID</span><span class="p">),</span>
+				<span class="nx">Severity</span><span class="p">:</span> <span class="nx">channelz</span><span class="p">.</span><span class="nx">CtInfo</span><span class="p">,</span>
+			<span class="p">},</span>
+		<span class="p">})</span>
+	<span class="p">}</span>
+	<span class="nx">cc</span><span class="p">.</span><span class="nx">conns</span><span class="p">[</span><span class="nx">ac</span><span class="p">]</span> <span class="p">=</span> <span class="kd">struct</span><span class="p">{}{}</span>
+	<span class="nx">cc</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+	<span class="k">return</span> <span class="nx">ac</span><span class="p">,</span> <span class="kc">nil</span>
+<span class="p">}</span>
+</code></pre></div><h3 id="acbalancerwrapper">acBalancerWrapper<a href="#acbalancerwrapper" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>acBalancerWrapper 是 addrConn 的 wrapper，实现了 SubConn 接口：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// acBalancerWrapper is a wrapper on top of ac for balancers.
+</span><span class="c1">// It implements balancer.SubConn interface.
+</span><span class="c1"></span><span class="kd">type</span> <span class="nx">acBalancerWrapper</span> <span class="kd">struct</span> <span class="p">{</span>
+	<span class="nx">mu</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Mutex</span>
+	<span class="nx">ac</span> <span class="o">*</span><span class="nx">addrConn</span>
+<span class="p">}</span>
+
+<span class="c1">// SubConn represents a gRPC sub connection.
+</span><span class="c1">// Each sub connection contains a list of addresses. gRPC will
+</span><span class="c1">// try to connect to them (in sequence), and stop trying the
+</span><span class="c1">// remainder once one connection is successful.
+</span><span class="c1">// gRPC 会按顺序尝试连接所有的地址, 在成功连接一个之后停止连接
+</span><span class="c1">//
+</span><span class="c1">// The reconnect backoff will be applied on the list, not a single address.
+</span><span class="c1">// For example, try_on_all_addresses -&gt; backoff -&gt; try_on_all_addresses.
+</span><span class="c1">//
+</span><span class="c1">// All SubConns start in IDLE, and will not try to connect. To trigger
+</span><span class="c1">// the connecting, Balancers must call Connect.
+</span><span class="c1">// When the connection encounters an error, it will reconnect immediately.
+</span><span class="c1">// When the connection becomes IDLE, it will not reconnect unless Connect is
+</span><span class="c1">// called.
+</span><span class="c1">//
+</span><span class="c1">// This interface is to be implemented by gRPC. Users should not need a
+</span><span class="c1">// brand new implementation of this interface. For the situations like
+</span><span class="c1">// testing, the new implementation should embed this interface. This allows
+</span><span class="c1">// gRPC to add new methods to this interface.
+</span><span class="c1"></span><span class="kd">type</span> <span class="nx">SubConn</span> <span class="kd">interface</span> <span class="p">{</span>
+	<span class="c1">// UpdateAddresses updates the addresses used in this SubConn.
+</span><span class="c1"></span>	<span class="c1">// gRPC checks if currently-connected address is still in the new list.
+</span><span class="c1"></span>	<span class="c1">// If it&#39;s in the list, the connection will be kept.
+</span><span class="c1"></span>	<span class="c1">// If it&#39;s not in the list, the connection will gracefully closed, and
+</span><span class="c1"></span>	<span class="c1">// a new connection will be created.
+</span><span class="c1"></span>	<span class="c1">//
+</span><span class="c1"></span>	<span class="c1">// This will trigger a state transition for the SubConn.
+</span><span class="c1"></span>	<span class="nf">UpdateAddresses</span><span class="p">([]</span><span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span><span class="p">)</span>
+	<span class="c1">// Connect starts the connecting for this SubConn.
+</span><span class="c1"></span>	<span class="nf">Connect</span><span class="p">()</span>
+<span class="p">}</span>
+</code></pre></div><p>在完成 NewSubConn 的调用后，还需要手动调用 <code>SubConn.Connect</code> 来完成连接的建立，在 Connect 中又会调用 <code>addrConn.connect</code>：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">acbw</span> <span class="o">*</span><span class="nx">acBalancerWrapper</span><span class="p">)</span> <span class="nf">Connect</span><span class="p">()</span> <span class="p">{</span>
+	<span class="nx">acbw</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+	<span class="k">defer</span> <span class="nx">acbw</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+	<span class="nx">acbw</span><span class="p">.</span><span class="nx">ac</span><span class="p">.</span><span class="nf">connect</span><span class="p">()</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">ac</span> <span class="o">*</span><span class="nx">addrConn</span><span class="p">)</span> <span class="nf">connect</span><span class="p">()</span> <span class="kt">error</span> <span class="p">{</span>
+	<span class="nx">ac</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+  <span class="c1">// 连接已经关闭，返回错误
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">ac</span><span class="p">.</span><span class="nx">state</span> <span class="o">==</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Shutdown</span> <span class="p">{</span>
+		<span class="nx">ac</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+		<span class="k">return</span> <span class="nx">errConnClosing</span>
+	<span class="p">}</span>
+  <span class="c1">// 连接状态不是 Idle，说明正在连接中，或者已经创建了连接
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">ac</span><span class="p">.</span><span class="nx">state</span> <span class="o">!=</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Idle</span> <span class="p">{</span>
+		<span class="nx">ac</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+		<span class="k">return</span> <span class="kc">nil</span>
+	<span class="p">}</span>
+	<span class="c1">// Update connectivity state within the lock to prevent subsequent or
+</span><span class="c1"></span>	<span class="c1">// concurrent calls from resetting the transport more than once.
+</span><span class="c1"></span>  <span class="c1">// 把连接状态更新为连接中
+</span><span class="c1"></span>	<span class="nx">ac</span><span class="p">.</span><span class="nf">updateConnectivityState</span><span class="p">(</span><span class="nx">connectivity</span><span class="p">.</span><span class="nx">Connecting</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
+	<span class="nx">ac</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+
+	<span class="c1">// Start a goroutine connecting to the server asynchronously.
+</span><span class="c1"></span>  <span class="c1">// 异步连接服务器
+</span><span class="c1"></span>	<span class="k">go</span> <span class="nx">ac</span><span class="p">.</span><span class="nf">resetTransport</span><span class="p">()</span>
+	<span class="k">return</span> <span class="kc">nil</span>
+<span class="p">}</span>
+</code></pre></div><h3 id="addrconnupdateconnectivitystate">addrConn.updateConnectivityState<a href="#addrconnupdateconnectivitystate" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">ac</span> <span class="o">*</span><span class="nx">addrConn</span><span class="p">)</span> <span class="nf">updateConnectivityState</span><span class="p">(</span><span class="nx">s</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">State</span><span class="p">,</span> <span class="nx">lastErr</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+   <span class="k">if</span> <span class="nx">ac</span><span class="p">.</span><span class="nx">state</span> <span class="o">==</span> <span class="nx">s</span> <span class="p">{</span>
+      <span class="k">return</span>
+   <span class="p">}</span>
+   <span class="nx">ac</span><span class="p">.</span><span class="nx">state</span> <span class="p">=</span> <span class="nx">s</span>
+   <span class="nx">channelz</span><span class="p">.</span><span class="nf">Infof</span><span class="p">(</span><span class="nx">logger</span><span class="p">,</span> <span class="nx">ac</span><span class="p">.</span><span class="nx">channelzID</span><span class="p">,</span> <span class="s">&#34;Subchannel Connectivity change to %v&#34;</span><span class="p">,</span> <span class="nx">s</span><span class="p">)</span>
+   <span class="nx">ac</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">handleSubConnStateChange</span><span class="p">(</span><span class="nx">ac</span><span class="p">.</span><span class="nx">acbw</span><span class="p">,</span> <span class="nx">s</span><span class="p">,</span> <span class="nx">lastErr</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div><p>updateConnectivityState 会调用 <code>ClientConn.handleSubConnStateChange</code> 来通知 gRPC 子连接状态发生变化，那 ClientConn 又是如何通知 Balancer 的呢？</p>
+<p>调用链如下：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="nx">addrConn</span><span class="p">.</span><span class="nx">updateConnectivityState</span> <span class="o">-</span><span class="p">&gt;</span> <span class="nx">ClientConn</span><span class="p">.</span><span class="nx">handleSubConnStateChange</span> <span class="o">-</span><span class="p">&gt;</span> <span class="nx">ccBalancerWrapper</span><span class="p">.</span><span class="nx">handleSubConnStateChange</span> <span class="o">-</span><span class="p">&gt;</span> <span class="nx">ccb</span><span class="p">.</span><span class="nx">scBuffer</span><span class="p">.</span><span class="nf">Put</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">scStateUpdate</span><span class="p">{</span>
+		<span class="nx">sc</span><span class="p">:</span>    <span class="nx">sc</span><span class="p">,</span>
+		<span class="nx">state</span><span class="p">:</span> <span class="nx">s</span><span class="p">,</span>
+		<span class="nx">err</span><span class="p">:</span>   <span class="nx">err</span><span class="p">,</span>
+	<span class="p">})</span> <span class="c1">// 发送到 channel
+</span></code></pre></div><p>还记得 watcher 函数吗？在 Build 的时候会启动一个协程来执行这个方法：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// watcher balancer functions sequentially, so the balancer can be implemented
+</span><span class="c1">// lock-free.
+</span><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">ccb</span> <span class="o">*</span><span class="nx">ccBalancerWrapper</span><span class="p">)</span> <span class="nf">watcher</span><span class="p">()</span> <span class="p">{</span>
+	<span class="k">for</span> <span class="p">{</span>
+		<span class="k">select</span> <span class="p">{</span>
+		<span class="c1">// handleSubConnStateChange触发
+</span><span class="c1"></span>		<span class="k">case</span> <span class="nx">t</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">ccb</span><span class="p">.</span><span class="nx">scBuffer</span><span class="p">.</span><span class="nf">Get</span><span class="p">():</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">scBuffer</span><span class="p">.</span><span class="nf">Load</span><span class="p">()</span>
+			<span class="k">if</span> <span class="nx">ccb</span><span class="p">.</span><span class="nx">done</span><span class="p">.</span><span class="nf">HasFired</span><span class="p">()</span> <span class="p">{</span>
+				<span class="k">break</span>
+			<span class="p">}</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">balancerMu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+			<span class="nx">su</span> <span class="o">:=</span> <span class="nx">t</span><span class="p">.(</span><span class="o">*</span><span class="nx">scStateUpdate</span><span class="p">)</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">balancer</span><span class="p">.</span><span class="nf">UpdateSubConnState</span><span class="p">(</span><span class="nx">su</span><span class="p">.</span><span class="nx">sc</span><span class="p">,</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConnState</span><span class="p">{</span><span class="nx">ConnectivityState</span><span class="p">:</span> <span class="nx">su</span><span class="p">.</span><span class="nx">state</span><span class="p">,</span> <span class="nx">ConnectionError</span><span class="p">:</span> <span class="nx">su</span><span class="p">.</span><span class="nx">err</span><span class="p">})</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">balancerMu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+		<span class="k">case</span> <span class="o">&lt;-</span><span class="nx">ccb</span><span class="p">.</span><span class="nx">done</span><span class="p">.</span><span class="nf">Done</span><span class="p">():</span>
+		<span class="p">}</span>
+
+		<span class="k">if</span> <span class="nx">ccb</span><span class="p">.</span><span class="nx">done</span><span class="p">.</span><span class="nf">HasFired</span><span class="p">()</span> <span class="p">{</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">balancer</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+			<span class="nx">scs</span> <span class="o">:=</span> <span class="nx">ccb</span><span class="p">.</span><span class="nx">subConns</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">subConns</span> <span class="p">=</span> <span class="kc">nil</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+			<span class="k">for</span> <span class="nx">acbw</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">scs</span> <span class="p">{</span>
+				<span class="nx">ccb</span><span class="p">.</span><span class="nx">cc</span><span class="p">.</span><span class="nf">removeAddrConn</span><span class="p">(</span><span class="nx">acbw</span><span class="p">.</span><span class="nf">getAddrConn</span><span class="p">(),</span> <span class="nx">errConnDrain</span><span class="p">)</span>
+			<span class="p">}</span>
+			<span class="nx">ccb</span><span class="p">.</span><span class="nf">UpdateState</span><span class="p">(</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">State</span><span class="p">{</span><span class="nx">ConnectivityState</span><span class="p">:</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Connecting</span><span class="p">,</span> <span class="nx">Picker</span><span class="p">:</span> <span class="kc">nil</span><span class="p">})</span>
+			<span class="k">return</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>哈哈，我们又回到了这里。看来 watcher 方法的工作就是监听子连接的状态变化，并且调用 <code>balancer.UpdateSubConnState</code> 来执行更新操作。</p>
+<h3 id="balancerupdatesubconnstate">balancer.UpdateSubConnState<a href="#balancerupdatesubconnstate" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">lb</span> <span class="o">*</span><span class="nx">lbBalancer</span><span class="p">)</span> <span class="nf">UpdateSubConnState</span><span class="p">(</span><span class="nx">sc</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConn</span><span class="p">,</span> <span class="nx">scs</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConnState</span><span class="p">)</span> <span class="p">{</span>
+	<span class="nx">s</span> <span class="o">:=</span> <span class="nx">scs</span><span class="p">.</span><span class="nx">ConnectivityState</span>
+	<span class="k">if</span> <span class="nx">logger</span><span class="p">.</span><span class="nf">V</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="p">{</span>
+		<span class="nx">logger</span><span class="p">.</span><span class="nf">Infof</span><span class="p">(</span><span class="s">&#34;lbBalancer: handle SubConn state change: %p, %v&#34;</span><span class="p">,</span> <span class="nx">sc</span><span class="p">,</span> <span class="nx">s</span><span class="p">)</span>
+	<span class="p">}</span>
+	<span class="nx">lb</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+	<span class="k">defer</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+
+	<span class="nx">oldS</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">scStates</span><span class="p">[</span><span class="nx">sc</span><span class="p">]</span>
+	<span class="k">if</span> <span class="p">!</span><span class="nx">ok</span> <span class="p">{</span>
+		<span class="k">if</span> <span class="nx">logger</span><span class="p">.</span><span class="nf">V</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="p">{</span>
+			<span class="nx">logger</span><span class="p">.</span><span class="nf">Infof</span><span class="p">(</span><span class="s">&#34;lbBalancer: got state changes for an unknown SubConn: %p, %v&#34;</span><span class="p">,</span> <span class="nx">sc</span><span class="p">,</span> <span class="nx">s</span><span class="p">)</span>
+		<span class="p">}</span>
+		<span class="k">return</span>
+	<span class="p">}</span>
+	<span class="nx">lb</span><span class="p">.</span><span class="nx">scStates</span><span class="p">[</span><span class="nx">sc</span><span class="p">]</span> <span class="p">=</span> <span class="nx">s</span>
+	<span class="k">switch</span> <span class="nx">s</span> <span class="p">{</span>
+	<span class="k">case</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Idle</span><span class="p">:</span>	<span class="c1">// Idle，则重新建立连接
+</span><span class="c1"></span>		<span class="nx">sc</span><span class="p">.</span><span class="nf">Connect</span><span class="p">()</span>
+	<span class="k">case</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Shutdown</span><span class="p">:</span>	<span class="c1">// Shutdown， 删除当前连接
+</span><span class="c1"></span>		<span class="c1">// When an address was removed by resolver, b called RemoveSubConn but
+</span><span class="c1"></span>		<span class="c1">// kept the sc&#39;s state in scStates. Remove state for this sc here.
+</span><span class="c1"></span>		<span class="nb">delete</span><span class="p">(</span><span class="nx">lb</span><span class="p">.</span><span class="nx">scStates</span><span class="p">,</span> <span class="nx">sc</span><span class="p">)</span>
+	<span class="p">}</span>
+	<span class="c1">// Force regenerate picker if
+</span><span class="c1"></span>	<span class="c1">//  - this sc became ready from not-ready
+</span><span class="c1"></span>	<span class="c1">//  - this sc became not-ready from ready
+</span><span class="c1"></span>  <span class="c1">// 更新状态，已经重新生成 picker
+</span><span class="c1"></span>	<span class="nx">lb</span><span class="p">.</span><span class="nf">updateStateAndPicker</span><span class="p">((</span><span class="nx">oldS</span> <span class="o">==</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Ready</span><span class="p">)</span> <span class="o">!=</span> <span class="p">(</span><span class="nx">s</span> <span class="o">==</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Ready</span><span class="p">),</span> <span class="kc">false</span><span class="p">)</span>
+
+	<span class="c1">// Enter fallback when the aggregated state is not Ready and the connection
+</span><span class="c1"></span>	<span class="c1">// to remote balancer is lost.
+</span><span class="c1"></span>	<span class="k">if</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">state</span> <span class="o">!=</span> <span class="nx">connectivity</span><span class="p">.</span><span class="nx">Ready</span> <span class="p">{</span>
+		<span class="k">if</span> <span class="p">!</span><span class="nx">lb</span><span class="p">.</span><span class="nx">inFallback</span> <span class="o">&amp;&amp;</span> <span class="p">!</span><span class="nx">lb</span><span class="p">.</span><span class="nx">remoteBalancerConnected</span> <span class="p">{</span>
+			<span class="c1">// Enter fallback.
+</span><span class="c1"></span>			<span class="nx">lb</span><span class="p">.</span><span class="nf">refreshSubConns</span><span class="p">(</span><span class="nx">lb</span><span class="p">.</span><span class="nx">resolvedBackendAddrs</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">lb</span><span class="p">.</span><span class="nx">usePickFirst</span><span class="p">)</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><h2 id="6-总结">6. 总结<a href="#6-总结" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>设计者为了让 Resolver ，Balancer 实现解耦，可谓是煞费苦心，而且也实现的十分优秀。当然 dnsBalancer 的实现相对来说有点复杂，如果没有使用过 grpclb 的话，理解起来会有点困难，不过这并不影响我们学习 Balancer 的设计思想，下面是调用关系总结：</p>
+<p><img src="https://blog-wero.oss-cn-shanghai.aliyuncs.com/img/resolver-balancer-clientconn%E4%BA%A4%E4%BA%92%E6%B5%81%E7%A8%8B.png" alt=""></p>
+<p>咱们下篇文章见！</p>
+
+			</div>
+			<hr class="post-end">
+			<footer class="post-info">
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>2020-11-06 18:07 &#43;0800</p>
+			</footer>
+		</article>
+		<div class="post-nav thin">
+			<a class="next-post" href="https://wangzeping722.github.io/posts/grpc-picker/">
+				<span class="post-nav-label"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>&nbsp;</span><br><span>gRPC RoundRobin Picker 分析</span>
+			</a>
+			<a class="prev-post" href="https://wangzeping722.github.io/posts/grpc-resolver/">
+				<span class="post-nav-label">&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span><br><span>gRPC Resolver 分析</span>
+			</a>
+		</div>
+		<div id="comments" class="thin">
+</div>
+	</main>
+
+<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+	<p>&copy; 2021 <a href="https://wangzeping722.github.io/">🐟</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+	<p>
+		Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://wangzeping722.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
+	</p>
+</footer>
+<script type="text/javascript"
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+
+	<script src="https://wangzeping722.github.io/js/bundle.min.7d8545daa55d62427355498dd8da13f98ff79a7938ce7d2a5e2ae1ec0de3beb8.js" integrity="sha256-fYVF2qVdYkJzVUmN2NoT+Y/3mnk4zn0qXirh7A3jvrg=" crossorigin="anonymous"></script>
+	
+
+</body>
+
+</html>

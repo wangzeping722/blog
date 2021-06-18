@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<meta name="theme-color" content="#494f5c">
+	<meta name="msapplication-TileColor" content="#494f5c">
+<meta itemprop="name" content="go-zero源码分析： P2C 负载均衡算法">
+<meta itemprop="description" content="看完文章基于gRPC的注册发现与负载均衡的原理和实战后大呼过瘾，但是文章中对负载均衡算法—— p2c 算法的介绍不是很详细，于是乎就去学习了一下。 1."><meta itemprop="datePublished" content="2021-01-11T16:30:18&#43;08:00" />
+<meta itemprop="dateModified" content="2021-01-11T16:30:18&#43;08:00" />
+<meta itemprop="wordCount" content="1419">
+<meta itemprop="keywords" content="" /><meta property="og:title" content="go-zero源码分析： P2C 负载均衡算法" />
+<meta property="og:description" content="看完文章基于gRPC的注册发现与负载均衡的原理和实战后大呼过瘾，但是文章中对负载均衡算法—— p2c 算法的介绍不是很详细，于是乎就去学习了一下。 1." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://wangzeping722.github.io/posts/go-zero-balancer-p2c/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2021-01-11T16:30:18&#43;08:00" />
+<meta property="article:modified_time" content="2021-01-11T16:30:18&#43;08:00" />
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="go-zero源码分析： P2C 负载均衡算法"/>
+<meta name="twitter:description" content="看完文章基于gRPC的注册发现与负载均衡的原理和实战后大呼过瘾，但是文章中对负载均衡算法—— p2c 算法的介绍不是很详细，于是乎就去学习了一下。 1."/>
+
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<link rel="mask-icon" href="/safari-pinned-tab.svg" color="">
+	<link rel="shortcut icon" href="/favicon.ico">
+
+	<title>go-zero源码分析： P2C 负载均衡算法</title>
+	<link rel="stylesheet" href="https://wangzeping722.github.io/css/style.min.037b6ee8f8c1baab6a3d0a9da11c3ff18a7552471f16c59fd98538d5ce99208b.css" integrity="sha256-A3tu6PjBuqtqPQqdoRw/8Yp1UkcfFsWf2YU41c6ZIIs=" crossorigin="anonymous">
+	
+</head>
+
+<body id="page">
+	
+	<header id="site-header" class="animated slideInUp">
+		<div class="hdr-wrapper section-inner">
+			<div class="hdr-left">
+				<div class="site-branding">
+					<a href="https://wangzeping722.github.io/">给我一条鱼🐟</a>
+				</div>
+				<nav class="site-nav hide-in-mobile">
+					
+				<a href="https://wangzeping722.github.io/posts/">文章</a>
+				<a href="https://wangzeping722.github.io/reading/">阅读</a>
+				<a href="https://wangzeping722.github.io/collect/">收集</a>
+				<a href="https://wangzeping722.github.io/about/">关于</a>
+
+				</nav>
+			</div>
+			<div class="hdr-right hdr-icons">
+				<span class="hdr-social hide-in-mobile"><a href="https://github.com/wangzeping722" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg></a></span><button id="menu-btn" class="hdr-btn" title=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+			</div>
+		</div>
+	</header>
+	<div id="mobile-menu" class="animated fast">
+		<ul>
+			<li><a href="https://wangzeping722.github.io/posts/">文章</a></li>
+			<li><a href="https://wangzeping722.github.io/reading/">阅读</a></li>
+			<li><a href="https://wangzeping722.github.io/collect/">收集</a></li>
+			<li><a href="https://wangzeping722.github.io/about/">关于</a></li>
+		</ul>
+	</div>
+
+
+	<main class="site-main section-inner animated fadeIn faster">
+		<article class="thin">
+			<header class="post-header">
+				<div class="post-meta"><span>Jan 11, 2021</span></div>
+				<h1>go-zero源码分析： P2C 负载均衡算法</h1>
+			</header>
+			<div class="content">
+				<p>看完文章<a href="https://mp.weixin.qq.com/s/olPGfrFczo22rhpPLBmpNw">基于gRPC的注册发现与负载均衡的原理和实战</a>后大呼过瘾，但是文章中对负载均衡算法—— p2c 算法的介绍不是很详细，于是乎就去学习了一下。</p>
+<h2 id="1-p2c-负载均衡算法介绍">1. P2C 负载均衡算法介绍<a href="#1-p2c-负载均衡算法介绍" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>P2C 的全称是 <strong>Power of Two Choices (P2C，两次随机选择) 负载均衡算法</strong>，相比其他负载均衡算法有着更加科学的 LB 策略，它通过随机选择出两个节点，然后根据一些条件计算出两个节点的负载情况，选择出负载小的那个节点。</p>
+<p>伪代码如下：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="nx">node1</span> <span class="o">:=</span> <span class="nf">randomNode</span><span class="p">()</span>
+<span class="nx">node2</span> <span class="o">:=</span> <span class="nf">randomNode</span><span class="p">()</span>
+<span class="nx">best</span> <span class="o">:=</span> <span class="nf">choiceTheBest</span><span class="p">(</span><span class="nx">node1</span><span class="p">,</span> <span class="nx">node2</span><span class="p">)</span>
+</code></pre></div><p>P2C 是在客户端侧实现的负载均衡算法，所以不可避免的要有评判节点连接负载高低的方法，只要知道负载率，那么就能够选出最优的节点。在 go-zero 中每个节点的负载情况都是由几个统计字段记录的，并通过这几个字段能够计算出节点连接当前的负载情况。</p>
+<h3 id="11-lag">1.1 lag<a href="#11-lag" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>lag 是节点延迟，根据*EWMA（<a href="https://www.cnblogs.com/jiangxinyang/p/9705198.html">指数加权移动平均算法</a>）*计算出来，此算法，是对观察值分别给予不同的权数，按不同权数求得移动平均值，并以最后的移动平均值为基础，确定预测值的方法。采用加权移动平均法，是因为观察期的近期观察值对预测值有较大影响，它更能反映近期变化的趋势。</p>
+<ul>
+<li>指数移动加权平均法，是指各数值的加权系数随时间呈指数式递减，越靠近当前时刻的数值加权系数就越大</li>
+<li>指数移动加权平均较传统的平均法来说，一是不需要保存过去所有的数值；二是计算量显著减小</li>
+</ul>
+<p>其中 EWMA 公式如下：
+$$
+X_i=w*X_{i-1}+(1-w)*X_{cur}
+$$
+EWMA 算法中 β 的计算公式（<a href="http://www.ruanyifeng.com/blog/2012/03/ranking_algorithm_newton_s_law_of_cooling.html">牛顿冷却定律</a>）也在这里一并给出，其中 decayTime 可根据自己的业务需求进行调整：</p>
+<pre><code>w := math.Exp(float64(-td) / float64(decayTime))
+</code></pre><h3 id="12-inflight">1.2 inflight<a href="#12-inflight" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>代表节点的当前正在处理的请求数，即反应了节点的拥塞程度。</p>
+<h3 id="13-success">1.3 success<a href="#13-success" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>节点请求的成功率，初始化为 1000，当成功率低于 500 的时候，当前节点就会被判定为不健康。success 同样是根据 EWMA 计算出来的。</p>
+<h2 id="2-go-zero-中对-p2c-算法的实现">2. go-zero 中对 P2C 算法的实现<a href="#2-go-zero-中对-p2c-算法的实现" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>我们可以看见在 p2c 包里面对 gRPC 的 subConn 进行了包装，每个连接都有自己的统计数据：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">subConn</span> <span class="kd">struct</span> <span class="p">{</span>
+	<span class="nx">addr</span>     <span class="nx">resolver</span><span class="p">.</span><span class="nx">Address</span>
+	<span class="nx">conn</span>     <span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConn</span>
+	<span class="nx">lag</span>      <span class="kt">uint64</span>	<span class="c1">// 延迟
+</span><span class="c1"></span>	<span class="nx">inflight</span> <span class="kt">int64</span>  <span class="c1">// 节点当前正在处理的请求数
+</span><span class="c1"></span>	<span class="nx">success</span>  <span class="kt">uint64</span> <span class="c1">// 请求成功率
+</span><span class="c1"></span>	<span class="nx">requests</span> <span class="kt">int64</span>
+	<span class="nx">last</span>     <span class="kt">int64</span>
+	<span class="nx">pick</span>     <span class="kt">int64</span>
+<span class="p">}</span>
+</code></pre></div><p>当要选择一个节点进行请求的时候就会调用 Pick 函数：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">p2cPicker</span><span class="p">)</span> <span class="nf">Pick</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">info</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">PickInfo</span><span class="p">)</span> <span class="p">(</span>
+	<span class="nx">conn</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">SubConn</span><span class="p">,</span> <span class="nx">done</span> <span class="kd">func</span><span class="p">(</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">DoneInfo</span><span class="p">),</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+	<span class="nx">p</span><span class="p">.</span><span class="nx">lock</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+	<span class="k">defer</span> <span class="nx">p</span><span class="p">.</span><span class="nx">lock</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+
+	<span class="kd">var</span> <span class="nx">chosen</span> <span class="o">*</span><span class="nx">subConn</span>
+	<span class="k">switch</span> <span class="nb">len</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">conns</span><span class="p">)</span> <span class="p">{</span>
+	<span class="k">case</span> <span class="mi">0</span><span class="p">:</span>
+		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">ErrNoSubConnAvailable</span>
+	<span class="k">case</span> <span class="mi">1</span><span class="p">:</span>
+		<span class="nx">chosen</span> <span class="p">=</span> <span class="nx">p</span><span class="p">.</span><span class="nf">choose</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">conns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="kc">nil</span><span class="p">)</span>
+	<span class="k">case</span> <span class="mi">2</span><span class="p">:</span>
+		<span class="nx">chosen</span> <span class="p">=</span> <span class="nx">p</span><span class="p">.</span><span class="nf">choose</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">conns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nx">p</span><span class="p">.</span><span class="nx">conns</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+	<span class="k">default</span><span class="p">:</span>
+		<span class="kd">var</span> <span class="nx">node1</span><span class="p">,</span> <span class="nx">node2</span> <span class="o">*</span><span class="nx">subConn</span>
+    <span class="c1">// 循环 pickTimes 次，如果还没有取到健康的节点，就取最后一次的结果
+</span><span class="c1"></span>		<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nx">pickTimes</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+			<span class="nx">a</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">r</span><span class="p">.</span><span class="nf">Intn</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">conns</span><span class="p">))</span>
+			<span class="nx">b</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">r</span><span class="p">.</span><span class="nf">Intn</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">conns</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+			<span class="k">if</span> <span class="nx">b</span> <span class="o">&gt;=</span> <span class="nx">a</span> <span class="p">{</span>
+				<span class="nx">b</span><span class="o">++</span>
+			<span class="p">}</span>
+			<span class="nx">node1</span> <span class="p">=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">conns</span><span class="p">[</span><span class="nx">a</span><span class="p">]</span>
+			<span class="nx">node2</span> <span class="p">=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">conns</span><span class="p">[</span><span class="nx">b</span><span class="p">]</span>
+			<span class="k">if</span> <span class="nx">node1</span><span class="p">.</span><span class="nf">healthy</span><span class="p">()</span> <span class="o">&amp;&amp;</span> <span class="nx">node2</span><span class="p">.</span><span class="nf">healthy</span><span class="p">()</span> <span class="p">{</span>
+				<span class="k">break</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+
+		<span class="nx">chosen</span> <span class="p">=</span> <span class="nx">p</span><span class="p">.</span><span class="nf">choose</span><span class="p">(</span><span class="nx">node1</span><span class="p">,</span> <span class="nx">node2</span><span class="p">)</span>
+	<span class="p">}</span>
+
+	<span class="nx">atomic</span><span class="p">.</span><span class="nf">AddInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">chosen</span><span class="p">.</span><span class="nx">inflight</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+	<span class="nx">atomic</span><span class="p">.</span><span class="nf">AddInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">chosen</span><span class="p">.</span><span class="nx">requests</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+  <span class="c1">// 回调函数
+</span><span class="c1"></span>	<span class="k">return</span> <span class="nx">chosen</span><span class="p">.</span><span class="nx">conn</span><span class="p">,</span> <span class="nx">p</span><span class="p">.</span><span class="nf">buildDoneFunc</span><span class="p">(</span><span class="nx">chosen</span><span class="p">),</span> <span class="kc">nil</span>
+<span class="p">}</span>
+
+<span class="c1">// 判断节点是否健康
+</span><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">c</span> <span class="o">*</span><span class="nx">subConn</span><span class="p">)</span> <span class="nf">healthy</span><span class="p">()</span> <span class="kt">bool</span> <span class="p">{</span>
+	<span class="k">return</span> <span class="nx">atomic</span><span class="p">.</span><span class="nf">LoadUint64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c</span><span class="p">.</span><span class="nx">success</span><span class="p">)</span> <span class="p">&gt;</span> <span class="nx">throttleSuccess</span>
+<span class="p">}</span>
+</code></pre></div><p>这个函数实现了负载均衡的逻辑：</p>
+<ul>
+<li>首先会随机选择出两个节点；</li>
+<li>然后分别计算出两个节点的负载；</li>
+<li>选择出负载最小的节点。</li>
+</ul>
+<p>再来看看具体的 <code>choose</code> 方法：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">p2cPicker</span><span class="p">)</span> <span class="nf">choose</span><span class="p">(</span><span class="nx">c1</span><span class="p">,</span> <span class="nx">c2</span> <span class="o">*</span><span class="nx">subConn</span><span class="p">)</span> <span class="o">*</span><span class="nx">subConn</span> <span class="p">{</span>
+	<span class="nx">start</span> <span class="o">:=</span> <span class="nb">int64</span><span class="p">(</span><span class="nx">timex</span><span class="p">.</span><span class="nf">Now</span><span class="p">())</span>
+	<span class="k">if</span> <span class="nx">c2</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">atomic</span><span class="p">.</span><span class="nf">StoreInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c1</span><span class="p">.</span><span class="nx">pick</span><span class="p">,</span> <span class="nx">start</span><span class="p">)</span>
+		<span class="k">return</span> <span class="nx">c1</span>
+	<span class="p">}</span>
+
+	<span class="k">if</span> <span class="nx">c1</span><span class="p">.</span><span class="nf">load</span><span class="p">()</span> <span class="p">&gt;</span> <span class="nx">c2</span><span class="p">.</span><span class="nf">load</span><span class="p">()</span> <span class="p">{</span>
+		<span class="nx">c1</span><span class="p">,</span> <span class="nx">c2</span> <span class="p">=</span> <span class="nx">c2</span><span class="p">,</span> <span class="nx">c1</span>
+	<span class="p">}</span>
+
+	<span class="nx">pick</span> <span class="o">:=</span> <span class="nx">atomic</span><span class="p">.</span><span class="nf">LoadInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c2</span><span class="p">.</span><span class="nx">pick</span><span class="p">)</span>
+	<span class="k">if</span> <span class="nx">start</span><span class="o">-</span><span class="nx">pick</span> <span class="p">&gt;</span> <span class="nx">forcePick</span> <span class="o">&amp;&amp;</span> <span class="nx">atomic</span><span class="p">.</span><span class="nf">CompareAndSwapInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c2</span><span class="p">.</span><span class="nx">pick</span><span class="p">,</span> <span class="nx">pick</span><span class="p">,</span> <span class="nx">start</span><span class="p">)</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="nx">c2</span>
+	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+		<span class="nx">atomic</span><span class="p">.</span><span class="nf">StoreInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c1</span><span class="p">.</span><span class="nx">pick</span><span class="p">,</span> <span class="nx">start</span><span class="p">)</span>
+		<span class="k">return</span> <span class="nx">c1</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// 节点的负载情况
+</span><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">c</span> <span class="o">*</span><span class="nx">subConn</span><span class="p">)</span> <span class="nf">load</span><span class="p">()</span> <span class="kt">int64</span> <span class="p">{</span>
+	<span class="c1">// plus one to avoid multiply zero
+</span><span class="c1"></span>	<span class="nx">lag</span> <span class="o">:=</span> <span class="nb">int64</span><span class="p">(</span><span class="nx">math</span><span class="p">.</span><span class="nf">Sqrt</span><span class="p">(</span><span class="nb">float64</span><span class="p">(</span><span class="nx">atomic</span><span class="p">.</span><span class="nf">LoadUint64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c</span><span class="p">.</span><span class="nx">lag</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)))</span>
+	<span class="nx">load</span> <span class="o">:=</span> <span class="nx">lag</span> <span class="o">*</span> <span class="p">(</span><span class="nx">atomic</span><span class="p">.</span><span class="nf">LoadInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c</span><span class="p">.</span><span class="nx">inflight</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+	<span class="k">if</span> <span class="nx">load</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="nx">penalty</span>
+	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="nx">load</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>可以看见，choose 做的工作也很少，就是比较两个节点的负载情况，然后选择负载最低的那个节点。看到这里，不免心生疑问，前面提到的 lag，success 究竟是在哪里完成的计算呀。其实是在节点完成 rpc 调用之后，会调用一个回调函数：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">p2cPicker</span><span class="p">)</span> <span class="nf">buildDoneFunc</span><span class="p">(</span><span class="nx">c</span> <span class="o">*</span><span class="nx">subConn</span><span class="p">)</span> <span class="kd">func</span><span class="p">(</span><span class="nx">info</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">DoneInfo</span><span class="p">)</span> <span class="p">{</span>
+	<span class="nx">start</span> <span class="o">:=</span> <span class="nb">int64</span><span class="p">(</span><span class="nx">timex</span><span class="p">.</span><span class="nf">Now</span><span class="p">())</span>
+	<span class="k">return</span> <span class="kd">func</span><span class="p">(</span><span class="nx">info</span> <span class="nx">balancer</span><span class="p">.</span><span class="nx">DoneInfo</span><span class="p">)</span> <span class="p">{</span>
+		<span class="nx">atomic</span><span class="p">.</span><span class="nf">AddInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c</span><span class="p">.</span><span class="nx">inflight</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1">// 当前时间
+</span><span class="c1"></span>		<span class="nx">now</span> <span class="o">:=</span> <span class="nx">timex</span><span class="p">.</span><span class="nf">Now</span><span class="p">()</span>
+    <span class="c1">// 上一次调用的时间
+</span><span class="c1"></span>		<span class="nx">last</span> <span class="o">:=</span> <span class="nx">atomic</span><span class="p">.</span><span class="nf">SwapInt64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c</span><span class="p">.</span><span class="nx">last</span><span class="p">,</span> <span class="nb">int64</span><span class="p">(</span><span class="nx">now</span><span class="p">))</span>
+    <span class="c1">// 获取时间间隔
+</span><span class="c1"></span>		<span class="nx">td</span> <span class="o">:=</span> <span class="nb">int64</span><span class="p">(</span><span class="nx">now</span><span class="p">)</span> <span class="o">-</span> <span class="nx">last</span>
+		<span class="k">if</span> <span class="nx">td</span> <span class="p">&lt;</span> <span class="mi">0</span> <span class="p">{</span>
+			<span class="nx">td</span> <span class="p">=</span> <span class="mi">0</span>
+		<span class="p">}</span>
+    <span class="c1">// 获取时间衰减系数
+</span><span class="c1"></span>		<span class="nx">w</span> <span class="o">:=</span> <span class="nx">math</span><span class="p">.</span><span class="nf">Exp</span><span class="p">(</span><span class="nb">float64</span><span class="p">(</span><span class="o">-</span><span class="nx">td</span><span class="p">)</span> <span class="o">/</span> <span class="nb">float64</span><span class="p">(</span><span class="nx">decayTime</span><span class="p">))</span>
+    <span class="c1">// 获取调用延时
+</span><span class="c1"></span>		<span class="nx">lag</span> <span class="o">:=</span> <span class="nb">int64</span><span class="p">(</span><span class="nx">now</span><span class="p">)</span> <span class="o">-</span> <span class="nx">start</span>
+		<span class="k">if</span> <span class="nx">lag</span> <span class="p">&lt;</span> <span class="mi">0</span> <span class="p">{</span>
+			<span class="nx">lag</span> <span class="p">=</span> <span class="mi">0</span>
+		<span class="p">}</span>
+		<span class="nx">olag</span> <span class="o">:=</span> <span class="nx">atomic</span><span class="p">.</span><span class="nf">LoadUint64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c</span><span class="p">.</span><span class="nx">lag</span><span class="p">)</span>
+		<span class="k">if</span> <span class="nx">olag</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+			<span class="nx">w</span> <span class="p">=</span> <span class="mi">0</span>
+		<span class="p">}</span>
+    <span class="c1">// 保存本地计算出的延迟数据
+</span><span class="c1"></span>		<span class="nx">atomic</span><span class="p">.</span><span class="nf">StoreUint64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c</span><span class="p">.</span><span class="nx">lag</span><span class="p">,</span> <span class="nb">uint64</span><span class="p">(</span><span class="nb">float64</span><span class="p">(</span><span class="nx">olag</span><span class="p">)</span><span class="o">*</span><span class="nx">w</span><span class="o">+</span><span class="nb">float64</span><span class="p">(</span><span class="nx">lag</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="nx">w</span><span class="p">)))</span>
+    <span class="c1">// success 的计算逻辑同上
+</span><span class="c1"></span>		<span class="nx">success</span> <span class="o">:=</span> <span class="nx">initSuccess</span>
+		<span class="k">if</span> <span class="nx">info</span><span class="p">.</span><span class="nx">Err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="p">!</span><span class="nx">codes</span><span class="p">.</span><span class="nf">Acceptable</span><span class="p">(</span><span class="nx">info</span><span class="p">.</span><span class="nx">Err</span><span class="p">)</span> <span class="p">{</span>
+			<span class="nx">success</span> <span class="p">=</span> <span class="mi">0</span>
+		<span class="p">}</span>
+		<span class="nx">osucc</span> <span class="o">:=</span> <span class="nx">atomic</span><span class="p">.</span><span class="nf">LoadUint64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c</span><span class="p">.</span><span class="nx">success</span><span class="p">)</span>
+		<span class="nx">atomic</span><span class="p">.</span><span class="nf">StoreUint64</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">c</span><span class="p">.</span><span class="nx">success</span><span class="p">,</span> <span class="nb">uint64</span><span class="p">(</span><span class="nb">float64</span><span class="p">(</span><span class="nx">osucc</span><span class="p">)</span><span class="o">*</span><span class="nx">w</span><span class="o">+</span><span class="nb">float64</span><span class="p">(</span><span class="nx">success</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="nx">w</span><span class="p">)))</span>
+
+		<span class="nx">stamp</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">stamp</span><span class="p">.</span><span class="nf">Load</span><span class="p">()</span>
+		<span class="k">if</span> <span class="nx">now</span><span class="o">-</span><span class="nx">stamp</span> <span class="o">&gt;=</span> <span class="nx">logInterval</span> <span class="p">{</span>
+			<span class="k">if</span> <span class="nx">p</span><span class="p">.</span><span class="nx">stamp</span><span class="p">.</span><span class="nf">CompareAndSwap</span><span class="p">(</span><span class="nx">stamp</span><span class="p">,</span> <span class="nx">now</span><span class="p">)</span> <span class="p">{</span>
+				<span class="nx">p</span><span class="p">.</span><span class="nf">logStats</span><span class="p">()</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><h2 id="3-总结">3. 总结<a href="#3-总结" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>以上，便是对于 go-zero 中 P2C 算法的分析。</p>
+<p>参考:</p>
+<ul>
+<li><a href="https://exceting.github.io/2020/08/13/%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1-P2C%E7%AE%97%E6%B3%95/">负载均衡-P2C算法</a></li>
+</ul>
+
+			</div>
+			<hr class="post-end">
+			<footer class="post-info">
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>2021-01-11 16:30 &#43;0800</p>
+			</footer>
+		</article>
+		<div class="post-nav thin">
+			<a class="next-post" href="https://wangzeping722.github.io/posts/rust-learn-trait/">
+				<span class="post-nav-label"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>&nbsp;</span><br><span>Rust学习——trait</span>
+			</a>
+			<a class="prev-post" href="https://wangzeping722.github.io/posts/grpc-picker/">
+				<span class="post-nav-label">&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span><br><span>gRPC RoundRobin Picker 分析</span>
+			</a>
+		</div>
+		<div id="comments" class="thin">
+</div>
+	</main>
+
+<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+	<p>&copy; 2021 <a href="https://wangzeping722.github.io/">🐟</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+	<p>
+		Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://wangzeping722.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
+	</p>
+</footer>
+<script type="text/javascript"
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+
+	<script src="https://wangzeping722.github.io/js/bundle.min.7d8545daa55d62427355498dd8da13f98ff79a7938ce7d2a5e2ae1ec0de3beb8.js" integrity="sha256-fYVF2qVdYkJzVUmN2NoT+Y/3mnk4zn0qXirh7A3jvrg=" crossorigin="anonymous"></script>
+	
+
+</body>
+
+</html>

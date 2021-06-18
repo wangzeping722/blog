@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>给我一条鱼🐟</title>
+    <link>https://wangzeping722.github.io/</link>
+    <description>Recent content on 给我一条鱼🐟</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>zh</language>
+    <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
+    <lastBuildDate>Fri, 18 Jun 2021 15:30:15 +0800</lastBuildDate><atom:link href="https://wangzeping722.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>设计模式-工厂模式</title>
+      <link>https://wangzeping722.github.io/posts/go-pattern-factory/</link>
+      <pubDate>Fri, 18 Jun 2021 15:30:15 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/posts/go-pattern-factory/</guid>
+      <description>工厂模式可以细分为简单工厂模式、工厂方法模式以及抽象工厂模式 。 简单工厂 当对象的创建逻辑很简单，不需要太多的初始化操作时，可以选择简单工厂模式</description>
+    </item>
+    
+    <item>
+      <title>逻辑题</title>
+      <link>https://wangzeping722.github.io/posts/logic/</link>
+      <pubDate>Sat, 24 Apr 2021 20:11:25 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/posts/logic/</guid>
+      <description>平时收藏的一些逻辑题，不定期更新。 1. 有n个球，两个人轮流拿，每次只能拿【1，7】个，就是一次最少拿一个，最多一次拿7个，最后拿的最后赢，如何</description>
+    </item>
+    
+    <item>
+      <title>Term Color</title>
+      <link>https://wangzeping722.github.io/posts/term-color/</link>
+      <pubDate>Sat, 17 Apr 2021 12:01:11 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/posts/term-color/</guid>
+      <description>ANSI转义序列（ANSI escape sequences）是一种的标准，用于控制视频文本上的光标位置、颜色和其他选项。在文本中嵌入确定的字节序列，大部</description>
+    </item>
+    
+    <item>
+      <title>Collect</title>
+      <link>https://wangzeping722.github.io/collect/</link>
+      <pubDate>Wed, 14 Apr 2021 18:44:35 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/collect/</guid>
+      <description>高性能 GO 代码</description>
+    </item>
+    
+    <item>
+      <title>Rust学习——trait</title>
+      <link>https://wangzeping722.github.io/posts/rust-learn-trait/</link>
+      <pubDate>Sat, 10 Apr 2021 17:30:17 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/posts/rust-learn-trait/</guid>
+      <description>trait 是 Rust 的灵魂。从语义上来说，trait 是在行为上对类型的约束，这种约束可以让 trait 有如下四种用法： 接口抽象：接口是对类型行为的统一约束； 泛型约束</description>
+    </item>
+    
+    <item>
+      <title>go-zero源码分析： P2C 负载均衡算法</title>
+      <link>https://wangzeping722.github.io/posts/go-zero-balancer-p2c/</link>
+      <pubDate>Mon, 11 Jan 2021 16:30:18 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/posts/go-zero-balancer-p2c/</guid>
+      <description>看完文章基于gRPC的注册发现与负载均衡的原理和实战后大呼过瘾，但是文章中对负载均衡算法—— p2c 算法的介绍不是很详细，于是乎就去学习了一下。 1.</description>
+    </item>
+    
+    <item>
+      <title>gRPC RoundRobin Picker 分析</title>
+      <link>https://wangzeping722.github.io/posts/grpc-picker/</link>
+      <pubDate>Mon, 09 Nov 2020 17:59:31 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/posts/grpc-picker/</guid>
+      <description>前言 上一篇文章提到过：Picker 是负载均衡器里面的一个组件，主要作用就是客户端要进行 rpc 调用的时候，在可用的连接中根据负载均衡策略挑选出最时</description>
+    </item>
+    
+    <item>
+      <title>阅读</title>
+      <link>https://wangzeping722.github.io/reading/</link>
+      <pubDate>Mon, 09 Nov 2020 14:49:16 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/reading/</guid>
+      <description>网络 Wireshark 网络分析就这么简单 100% 操作系统 APUE 10% 编程语言 其他 MySQL 是怎么运行的 30%</description>
+    </item>
+    
+    <item>
+      <title>gRPC Balancer 分析</title>
+      <link>https://wangzeping722.github.io/posts/grpc-balancer/</link>
+      <pubDate>Fri, 06 Nov 2020 18:07:55 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/posts/grpc-balancer/</guid>
+      <description>1. 负载均衡 gRPC 实现负载均衡的方法主要有三种，分别是 集中式 LB（Proxy Model） 进程内 LB（Balancing-aware Client） 独</description>
+    </item>
+    
+    <item>
+      <title>gRPC Resolver 分析</title>
+      <link>https://wangzeping722.github.io/posts/grpc-resolver/</link>
+      <pubDate>Thu, 29 Oct 2020 09:56:05 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/posts/grpc-resolver/</guid>
+      <description>1. 前言 gRPC Resolver 是 gRPC 的核心功能之一，与 gRPC Balancer 一起负责 gRPC 调用其它服务时的负载均衡。gRPC 负载均衡是针对每次请求，而不是连接，这样可以保证服务端负载的</description>
+    </item>
+    
+  </channel>
+</rss>
