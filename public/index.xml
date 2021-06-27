@@ -7,10 +7,15 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>zh</language>
     <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-    <lastBuildDate>Sat, 24 Apr 2021 20:11:25 +0800</lastBuildDate>
-    
-	<atom:link href="https://wangzeping722.github.io/index.xml" rel="self" type="application/rss+xml" />
-    
+    <lastBuildDate>Fri, 18 Jun 2021 15:30:15 +0800</lastBuildDate><atom:link href="https://wangzeping722.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>设计模式-工厂模式</title>
+      <link>https://wangzeping722.github.io/posts/go-pattern-factory/</link>
+      <pubDate>Fri, 18 Jun 2021 15:30:15 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/posts/go-pattern-factory/</guid>
+      <description>工厂模式可以细分为简单工厂模式、工厂方法模式以及抽象工厂模式 。 简单工厂 当对象的创建逻辑很简单，不需要太多的初始化操作时，可以选择简单工厂模式</description>
+    </item>
     
     <item>
       <title>逻辑题</title>
@@ -91,15 +96,6 @@
       
       <guid>https://wangzeping722.github.io/posts/grpc-resolver/</guid>
       <description>1. 前言 gRPC Resolver 是 gRPC 的核心功能之一，与 gRPC Balancer 一起负责 gRPC 调用其它服务时的负载均衡。gRPC 负载均衡是针对每次请求，而不是连接，这样可以保证服务端负载的</description>
-    </item>
-    
-    <item>
-      <title>DNS学习总结</title>
-      <link>https://wangzeping722.github.io/posts/dns-recording/</link>
-      <pubDate>Mon, 23 Dec 2019 10:36:05 +0800</pubDate>
-      
-      <guid>https://wangzeping722.github.io/posts/dns-recording/</guid>
-      <description>DNS 有多种记录类型，每种记录都有不同的作用，这篇文章主要总结了常用的记录。 A A（Address）记录用来指定主机名（域名）对应的 IPv4 地址记录。比</description>
     </item>
     
   </channel>
