@@ -7,7 +7,16 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>zh</language>
     <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-    <lastBuildDate>Fri, 18 Jun 2021 15:30:15 +0800</lastBuildDate><atom:link href="https://wangzeping722.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sun, 27 Jun 2021 23:12:50 +0800</lastBuildDate><atom:link href="https://wangzeping722.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Raft</title>
+      <link>https://wangzeping722.github.io/posts/raft/</link>
+      <pubDate>Sun, 27 Jun 2021 23:12:50 +0800</pubDate>
+      
+      <guid>https://wangzeping722.github.io/posts/raft/</guid>
+      <description>1. Raft 简介 Raft 是近年来非常受欢迎的共识算法，其目的就是为了在多个节点达成共识，允许一组机器像一个整体一样工作，即使一些机器出现故障、网络出现分区</description>
+    </item>
+    
     <item>
       <title>设计模式-工厂模式</title>
       <link>https://wangzeping722.github.io/posts/go-pattern-factory/</link>
@@ -87,15 +96,6 @@
       
       <guid>https://wangzeping722.github.io/posts/grpc-balancer/</guid>
       <description>1. 负载均衡 gRPC 实现负载均衡的方法主要有三种，分别是 集中式 LB（Proxy Model） 进程内 LB（Balancing-aware Client） 独</description>
-    </item>
-    
-    <item>
-      <title>gRPC Resolver 分析</title>
-      <link>https://wangzeping722.github.io/posts/grpc-resolver/</link>
-      <pubDate>Thu, 29 Oct 2020 09:56:05 +0800</pubDate>
-      
-      <guid>https://wangzeping722.github.io/posts/grpc-resolver/</guid>
-      <description>1. 前言 gRPC Resolver 是 gRPC 的核心功能之一，与 gRPC Balancer 一起负责 gRPC 调用其它服务时的负载均衡。gRPC 负载均衡是针对每次请求，而不是连接，这样可以保证服务端负载的</description>
     </item>
     
   </channel>
