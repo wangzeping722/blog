@@ -6,11 +6,180 @@
 		<generator>Hugo -- gohugo.io</generator>
 		<language>zh</language>
 		<copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-		<lastBuildDate>Sun, 27 Jun 2021 23:12:50 +0800</lastBuildDate>
+		<lastBuildDate>Tue, 29 Jun 2021 10:42:41 +0800</lastBuildDate>
 		<atom:link href="https://wangzeping722.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
 		
 		<item>
-			<title>Raft</title>
+			<title>Raft Lab 2a</title>
+			<link>https://wangzeping722.github.io/posts/raft-lab-2a/</link>
+			<pubDate>Tue, 29 Jun 2021 10:42:41 +0800</pubDate>
+			
+			<guid>https://wangzeping722.github.io/posts/raft-lab-2a/</guid>
+			<description>Raft实验基于2021的代码。 lab2a 是的目的就是选主，首先需要明确，不使用timer或者ticker，而是使用sleep，这也是实验要求。 代码</description>
+			<content type="html"><![CDATA[<p>Raft实验基于2021的代码。</p>
+<p>lab2a 是的目的就是选主，首先需要明确，不使用timer或者ticker，而是使用sleep，这也是实验要求。</p>
+<p>代码库已经给我们搭建好了基础框架，我们只需要按照论文的要求来设计和填入代码就能够完成实验，lab2a的大致思路就是：raft协议中的leader定期向follower发送心跳，接受到心跳的follower要及时应答，如果follower没有及时接收到心跳，那么就会触发选主。</p>
+<h3 id="raft结构体">Raft结构体</h3>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">Raft</span> <span class="kd">struct</span> <span class="p">{</span>
+   <span class="nx">mu</span>        <span class="nx">sync</span><span class="p">.</span><span class="nx">Mutex</span>          <span class="c1">// Lock to protect shared access to this peer&#39;s state
+</span><span class="c1"></span>   <span class="nx">peers</span>     <span class="p">[]</span><span class="o">*</span><span class="nx">labrpc</span><span class="p">.</span><span class="nx">ClientEnd</span> <span class="c1">// RPC end points of all peers
+</span><span class="c1"></span>   <span class="nx">persister</span> <span class="o">*</span><span class="nx">Persister</span>          <span class="c1">// Object to hold this peer&#39;s persisted state
+</span><span class="c1"></span>   <span class="nx">me</span>        <span class="kt">int</span>                 <span class="c1">// this peer&#39;s index into peers[]
+</span><span class="c1"></span>   <span class="nx">dead</span>      <span class="kt">int32</span>               <span class="c1">// set by Kill()
+</span><span class="c1"></span>
+   <span class="c1">// Your data here (2A, 2B, 2C).
+</span><span class="c1"></span>   <span class="c1">// Look at the paper&#39;s Figure 2 for a description of what
+</span><span class="c1"></span>   <span class="c1">// state a Raft server must maintain.
+</span><span class="c1"></span>
+   <span class="c1">// 2A leader election and heartbeat
+</span><span class="c1"></span>   <span class="nx">currentTerm</span>       <span class="kt">int</span>       <span class="c1">// 当前任期
+</span><span class="c1"></span>   <span class="nx">state</span>             <span class="nx">State</span>     <span class="c1">// 节点状态
+</span><span class="c1"></span>   <span class="nx">votedFor</span>          <span class="kt">int</span>       <span class="c1">// 投票
+</span><span class="c1"></span>   <span class="nx">lastHeartBeatTime</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Time</span> <span class="c1">// 上次心跳的时间
+</span><span class="c1"></span>   <span class="nx">heartBeatChan</span>     <span class="kd">chan</span> <span class="kd">struct</span><span class="p">{}</span> <span class="c1">// 通知接收到心跳的chan
+</span><span class="c1"></span>   <span class="c1">//TODO 2B and 2C
+</span><span class="c1"></span><span class="p">}</span>
+</code></pre></div><p>Raft 结构体保存了当前节点的状态，已经其他节点的信息。</p>
+<p>所以，在Make函数中，我们要返回代表当前节点的raft对象：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">Make</span><span class="p">(</span><span class="nx">peers</span> <span class="p">[]</span><span class="o">*</span><span class="nx">labrpc</span><span class="p">.</span><span class="nx">ClientEnd</span><span class="p">,</span> <span class="nx">me</span> <span class="kt">int</span><span class="p">,</span>
+	<span class="nx">persister</span> <span class="o">*</span><span class="nx">Persister</span><span class="p">,</span> <span class="nx">applyCh</span> <span class="kd">chan</span> <span class="nx">ApplyMsg</span><span class="p">)</span> <span class="o">*</span><span class="nx">Raft</span> <span class="p">{</span>
+	<span class="nx">rf</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">Raft</span><span class="p">{}</span>
+	<span class="nx">rf</span><span class="p">.</span><span class="nx">peers</span> <span class="p">=</span> <span class="nx">peers</span>
+	<span class="nx">rf</span><span class="p">.</span><span class="nx">persister</span> <span class="p">=</span> <span class="nx">persister</span>
+	<span class="nx">rf</span><span class="p">.</span><span class="nx">me</span> <span class="p">=</span> <span class="nx">me</span>
+
+	<span class="c1">// Your initialization code here (2A, 2B, 2C).
+</span><span class="c1"></span>	<span class="nx">rf</span><span class="p">.</span><span class="nx">state</span> <span class="p">=</span> <span class="nx">Follower</span>
+	<span class="nx">rf</span><span class="p">.</span><span class="nx">votedFor</span> <span class="p">=</span> <span class="o">-</span><span class="mi">1</span>
+	<span class="nx">rf</span><span class="p">.</span><span class="nx">currentTerm</span> <span class="p">=</span> <span class="mi">0</span>
+	<span class="nx">rf</span><span class="p">.</span><span class="nx">heartBeatChan</span> <span class="p">=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">{})</span>
+
+	<span class="c1">// initialize from state persisted before a crash
+</span><span class="c1"></span>	<span class="nx">rf</span><span class="p">.</span><span class="nf">readPersist</span><span class="p">(</span><span class="nx">persister</span><span class="p">.</span><span class="nf">ReadRaftState</span><span class="p">())</span>
+
+	<span class="c1">// start ticker goroutine to start elections
+</span><span class="c1"></span>	<span class="k">go</span> <span class="nx">rf</span><span class="p">.</span><span class="nf">electTicker</span><span class="p">()</span>
+	<span class="k">go</span> <span class="nx">rf</span><span class="p">.</span><span class="nf">heartBeatTicker</span><span class="p">()</span>
+
+	<span class="k">return</span> <span class="nx">rf</span>
+<span class="p">}</span>
+</code></pre></div><p>可以看到，Make函数做了一些列的初始化操作，并开启了两个后台运行的协程。</p>
+<h3 id="electticker">electTicker</h3>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">rf</span> <span class="o">*</span><span class="nx">Raft</span><span class="p">)</span> <span class="nf">electTicker</span><span class="p">()</span> <span class="p">{</span>
+	<span class="k">for</span> <span class="nx">rf</span><span class="p">.</span><span class="nf">killed</span><span class="p">()</span> <span class="o">==</span> <span class="kc">false</span> <span class="p">{</span>
+		<span class="c1">// 获取随机的选举超时时间
+</span><span class="c1"></span>		<span class="nx">electTimeout</span> <span class="o">:=</span> <span class="nf">getElectTimeout</span><span class="p">()</span>
+		<span class="c1">// 使用time.Sleep来控制，而不是使用timer，使用timer在系统负载增加的时候可能会延迟。
+</span><span class="c1"></span>		<span class="nx">time</span><span class="p">.</span><span class="nf">Sleep</span><span class="p">(</span><span class="nx">electTimeout</span><span class="p">)</span>
+
+		<span class="k">if</span> <span class="nx">rf</span><span class="p">.</span><span class="nf">getState</span><span class="p">()</span> <span class="o">==</span> <span class="nx">Leader</span> <span class="p">{</span>
+			<span class="k">continue</span>
+		<span class="p">}</span>
+
+		<span class="nx">duration</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Since</span><span class="p">(</span><span class="nx">rf</span><span class="p">.</span><span class="nf">getHeartbeatTime</span><span class="p">())</span>
+		<span class="k">if</span> <span class="nx">duration</span> <span class="p">&gt;</span> <span class="nx">electTimeout</span> <span class="p">{</span>
+			<span class="c1">// 没有收到心跳，发起超时选举
+</span><span class="c1"></span>			<span class="k">go</span> <span class="nx">rf</span><span class="p">.</span><span class="nf">election</span><span class="p">()</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>electTicker 方法实现了超时选举，需要注意的是 <code>getElectTimeout()</code> 获取的是一个随机的超时时间。</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">getElectTimeout</span><span class="p">()</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Duration</span> <span class="p">{</span>
+	<span class="nx">ms</span> <span class="o">:=</span> <span class="mi">300</span> <span class="o">+</span> <span class="nx">rand</span><span class="p">.</span><span class="nf">Intn</span><span class="p">(</span><span class="mi">240</span><span class="p">)</span>
+	<span class="k">return</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Duration</span><span class="p">(</span><span class="nx">ms</span><span class="p">)</span> <span class="o">*</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Millisecond</span>
+<span class="p">}</span>
+</code></pre></div><h3 id="heartbeatticker">heartBeatTicker</h3>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">rf</span> <span class="o">*</span><span class="nx">Raft</span><span class="p">)</span> <span class="nf">heartBeatTicker</span><span class="p">()</span> <span class="p">{</span>
+	<span class="k">for</span> <span class="nx">rf</span><span class="p">.</span><span class="nf">killed</span><span class="p">()</span> <span class="o">==</span> <span class="kc">false</span> <span class="p">{</span>
+		<span class="nx">time</span><span class="p">.</span><span class="nf">Sleep</span><span class="p">(</span><span class="nx">heartBeatInterval</span><span class="p">)</span>
+	  <span class="c1">// 不是leader， 不能发送心跳
+</span><span class="c1"></span>		<span class="k">if</span> <span class="nx">rf</span><span class="p">.</span><span class="nf">getState</span><span class="p">()</span> <span class="o">!=</span> <span class="nx">Leader</span> <span class="p">{</span>
+			<span class="k">continue</span>
+		<span class="p">}</span>
+		<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">rf</span><span class="p">.</span><span class="nx">peers</span> <span class="p">{</span>
+			<span class="k">if</span> <span class="nx">rf</span><span class="p">.</span><span class="nx">me</span> <span class="o">==</span> <span class="nx">i</span> <span class="p">{</span>
+				<span class="k">continue</span>
+			<span class="p">}</span>
+			<span class="c1">//DPrintf(&#34;[server-%d] heartBeatTicker to peer[%d]\n&#34;, rf.me, i)
+</span><span class="c1"></span>			<span class="k">go</span> <span class="nx">rf</span><span class="p">.</span><span class="nf">sendHeartBeat</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>以上两个函数就是实现超时选举的关键，其他rpc请求只需要按照论文所要求的的翻译出来即可。</p>
+<h3 id="如何赢得选票">如何赢得选票？</h3>
+<p>在candidate进行选举的时候，会向所有的peer发送<code>RequestVote</code> 这个PRC请求，如果收到的投票大于等于<code>len(rf.peers)/2 + 1</code>  , 也就是一半以上，那么candidate就会变成leader。</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// 发送请求
+</span><span class="c1"></span><span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">rf</span><span class="p">.</span><span class="nx">peers</span> <span class="p">{</span>
+		<span class="k">if</span> <span class="nx">i</span> <span class="o">==</span> <span class="nx">rf</span><span class="p">.</span><span class="nx">me</span> <span class="p">{</span>
+			<span class="k">continue</span>
+		<span class="p">}</span>
+		<span class="nx">reply</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">RequestVoteReply</span><span class="p">{}</span>
+		<span class="k">go</span> <span class="kd">func</span><span class="p">(</span><span class="nx">server</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+			<span class="k">if</span> <span class="p">!</span><span class="nx">rf</span><span class="p">.</span><span class="nf">sendRequestVote</span><span class="p">(</span><span class="nx">server</span><span class="p">,</span> <span class="nx">args</span><span class="p">,</span> <span class="nx">reply</span><span class="p">)</span> <span class="p">{</span>
+				<span class="c1">//DPrintf(&#34;[server-%d] sendRequestVote failed rpc to peer[%d]\n&#34;, rf.me, server)
+</span><span class="c1"></span>				<span class="nx">notifyChan</span> <span class="o">&lt;-</span> <span class="kd">struct</span><span class="p">{}{}</span>
+				<span class="k">return</span>
+			<span class="p">}</span>
+			<span class="nx">rf</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+			<span class="k">defer</span> <span class="nx">rf</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+
+			<span class="k">if</span> <span class="nx">startTerm</span> <span class="o">!=</span> <span class="nx">rf</span><span class="p">.</span><span class="nx">currentTerm</span> <span class="p">{</span>
+				<span class="k">return</span>
+			<span class="p">}</span>
+
+			<span class="k">if</span> <span class="nx">reply</span><span class="p">.</span><span class="nx">Term</span> <span class="p">&gt;</span> <span class="nx">rf</span><span class="p">.</span><span class="nx">currentTerm</span> <span class="p">{</span>
+				<span class="nx">rf</span><span class="p">.</span><span class="nf">becomeFollower</span><span class="p">(</span><span class="nx">reply</span><span class="p">.</span><span class="nx">Term</span><span class="p">)</span>
+			<span class="p">}</span>
+
+			<span class="k">if</span> <span class="nx">reply</span><span class="p">.</span><span class="nx">VoteGranted</span> <span class="p">{</span>
+				<span class="nx">grantVoteCount</span><span class="o">++</span>
+			<span class="p">}</span>
+			<span class="nx">notifyChan</span> <span class="o">&lt;-</span> <span class="kd">struct</span><span class="p">{}{}</span>
+		<span class="p">}(</span><span class="nx">i</span><span class="p">)</span>
+	<span class="p">}</span>
+	
+	<span class="c1">// for循环获取结果，并添加超时处理
+</span><span class="c1"></span>	<span class="k">for</span> <span class="p">{</span>
+		<span class="k">select</span> <span class="p">{</span>
+		<span class="k">case</span> <span class="o">&lt;-</span><span class="nx">notifyChan</span><span class="p">:</span>
+			<span class="nx">rf</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+			<span class="k">if</span> <span class="nx">rf</span><span class="p">.</span><span class="nx">currentTerm</span> <span class="o">!=</span> <span class="nx">startTerm</span> <span class="p">{</span>
+				<span class="nx">rf</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+				<span class="k">return</span>
+			<span class="p">}</span>
+			<span class="k">if</span> <span class="nx">rf</span><span class="p">.</span><span class="nx">state</span> <span class="o">!=</span> <span class="nx">Candidate</span> <span class="p">{</span>
+				<span class="nx">rf</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+				<span class="k">return</span>
+			<span class="p">}</span>
+
+			<span class="k">if</span> <span class="nx">grantVoteCount</span> <span class="o">&gt;=</span> <span class="nx">rf</span><span class="p">.</span><span class="nf">getMajority</span><span class="p">()</span> <span class="p">{</span>
+				<span class="nx">rf</span><span class="p">.</span><span class="nf">becomeLeader</span><span class="p">()</span>
+				<span class="nx">rf</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+				<span class="k">return</span>
+			<span class="p">}</span>
+
+			<span class="nx">rf</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+		<span class="k">case</span> <span class="o">&lt;-</span><span class="nx">time</span><span class="p">.</span><span class="nf">After</span><span class="p">(</span><span class="nf">getElectTimeout</span><span class="p">()):</span>
+			<span class="c1">// 退出
+</span><span class="c1"></span>			<span class="nf">DPrintf</span><span class="p">(</span><span class="s">&#34;[server-%d] elect timeout, state[%d]\n&#34;</span><span class="p">,</span> <span class="nx">rf</span><span class="p">.</span><span class="nx">me</span><span class="p">,</span> <span class="nx">rf</span><span class="p">.</span><span class="nf">getState</span><span class="p">())</span>
+			<span class="k">return</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+</code></pre></div><p>lab2a的实现还是很简单的，但是在选举超时处理，和心跳方面需要下点功夫，不然三个测试会过不了哦。</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="err">➜</span>  <span class="nx">raft</span> <span class="nx">git</span><span class="p">:(</span><span class="nx">feat</span><span class="o">/</span><span class="nx">raft_2a</span><span class="p">)</span> <span class="err">✗</span> <span class="k">go</span> <span class="nx">test</span> <span class="o">-</span><span class="nx">run</span> <span class="mi">2</span><span class="nx">A</span> <span class="o">-</span><span class="nx">race</span>
+<span class="nf">Test</span> <span class="p">(</span><span class="mi">2</span><span class="nx">A</span><span class="p">):</span> <span class="nx">initial</span> <span class="nx">election</span> <span class="o">...</span>
+  <span class="o">...</span> <span class="nx">Passed</span> <span class="o">--</span>   <span class="mf">3.0</span>  <span class="mi">3</span>   <span class="mi">46</span>    <span class="mi">6142</span>    <span class="mi">0</span>
+<span class="nf">Test</span> <span class="p">(</span><span class="mi">2</span><span class="nx">A</span><span class="p">):</span> <span class="nx">election</span> <span class="nx">after</span> <span class="nx">network</span> <span class="nx">failure</span> <span class="o">...</span>
+  <span class="o">...</span> <span class="nx">Passed</span> <span class="o">--</span>   <span class="mf">4.5</span>  <span class="mi">3</span>   <span class="mi">96</span>    <span class="mi">8501</span>    <span class="mi">0</span>
+<span class="nf">Test</span> <span class="p">(</span><span class="mi">2</span><span class="nx">A</span><span class="p">):</span> <span class="nx">multiple</span> <span class="nx">elections</span> <span class="o">...</span>
+  <span class="o">...</span> <span class="nx">Passed</span> <span class="o">--</span>   <span class="mf">5.5</span>  <span class="mi">7</span>  <span class="mi">480</span>   <span class="mi">42904</span>    <span class="mi">0</span>
+<span class="nx">PASS</span>
+<span class="nx">ok</span>      <span class="mf">6.824</span><span class="o">/</span><span class="nx">raft</span>      <span class="mf">13.397</span><span class="nx">s</span>
+</code></pre></div>]]></content>
+		</item>
+		
+		<item>
+			<title>Raft 学习笔记</title>
 			<link>https://wangzeping722.github.io/posts/raft/</link>
 			<pubDate>Sun, 27 Jun 2021 23:12:50 +0800</pubDate>
 			
